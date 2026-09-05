@@ -1,0 +1,8 @@
+.ai/
+.codex/
+.agents/
+node_modules/
+.next/
+pnpm-lock.yaml
+apps/api/
+next-env.d.ts

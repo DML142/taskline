@@ -1,0 +1,16 @@
+{
+  "name": "taskline",
+  "private": true,
+  "packageManager": "pnpm@11.20.0",
+  "scripts": {
+    "dev": "pnpm --filter @taskline/web dev",
+    "lint": "pnpm --filter @taskline/web lint",
+    "typecheck": "pnpm --filter @taskline/web typecheck",
+    "build": "pnpm --filter @taskline/web build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6"
+  }
+}
