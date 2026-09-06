@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,7 @@ func TestLoad(t *testing.T) {
 		t.Run(tt.value, func(t *testing.T) {
 			t.Setenv("HTTP_ADDR", tt.value)
 			t.Setenv("DATABASE_URL", tt.databaseURL)
+			setValidAuthEnv(t)
 			cfg, err := Load()
 			if tt.invalid {
 				require.Error(t, err)
@@ -42,6 +44,7 @@ func TestLoad(t *testing.T) {
 func TestLoadRejectsNonURLDatabaseConfig(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("DATABASE_URL", "host=127.0.0.1 port=5432 user=taskline dbname=taskline")
+	setValidAuthEnv(t)
 
 	_, err := Load()
 
@@ -52,10 +55,47 @@ func TestLoadDoesNotExposeMalformedDatabaseURL(t *testing.T) {
 	const databaseURL = "postgres://user:unique-db-test-secret@127.0.0.1:5432/taskline?sslmode=not-a-valid-mode"
 	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("DATABASE_URL", databaseURL)
+	setValidAuthEnv(t)
 
 	_, err := Load()
 
 	require.EqualError(t, err, "DATABASE_URL must be a valid PostgreSQL connection string")
 	require.NotContains(t, err.Error(), "unique-db-test-secret")
 	require.NotContains(t, err.Error(), databaseURL)
+}
+
+func TestLoadRejectsShortJWTSecret(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
+	t.Setenv("JWT_SECRET", "too-short")
+
+	_, err := Load()
+
+	require.EqualError(t, err, "JWT_SECRET must be at least 32 bytes")
+	require.NotContains(t, err.Error(), "too-short")
+}
+
+func TestLoadAcceptsAuthenticationConfiguration(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
+	setValidAuthEnv(t)
+	t.Setenv("WEB_ORIGIN", "https://app.taskline.example")
+	t.Setenv("COOKIE_SECURE", "true")
+
+	cfg, err := Load()
+
+	require.NoError(t, err)
+	require.Equal(t, "https://app.taskline.example", cfg.Auth.WebOrigin)
+	require.True(t, cfg.Auth.CookieSecure)
+	require.Equal(t, "taskline-api", cfg.Auth.JWTIssuer)
+	require.Equal(t, "taskline-web", cfg.Auth.JWTAudience)
+}
+
+func setValidAuthEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("JWT_SECRET", strings.Repeat("a", 32))
+	t.Setenv("JWT_ISSUER", "taskline-api")
+	t.Setenv("JWT_AUDIENCE", "taskline-web")
+	t.Setenv("WEB_ORIGIN", "http://localhost:3000")
+	t.Setenv("COOKIE_SECURE", "false")
 }

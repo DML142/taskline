@@ -3,3 +3,30 @@
 //   sqlc v1.30.0
 
 package database
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type Session struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	FamilyID   uuid.UUID
+	TokenHash  []byte
+	ExpiresAt  time.Time
+	RevokedAt  pgtype.Timestamptz
+	ReplacedBy pgtype.UUID
+	CreatedAt  time.Time
+}
+
+type User struct {
+	ID           uuid.UUID
+	Email        string
+	Name         string
+	PasswordHash string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}

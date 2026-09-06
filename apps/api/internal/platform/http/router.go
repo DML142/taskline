@@ -14,7 +14,7 @@ type Pinger interface {
 	Ping(context.Context) error
 }
 
-func NewRouter(logger *slog.Logger, readiness Pinger) http.Handler {
+func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(func(next http.Handler) http.Handler {
@@ -65,6 +65,9 @@ func NewRouter(logger *slog.Logger, readiness Pinger) http.Handler {
 			logger.Debug("write readiness response", "error", err)
 		}
 	})
+	if authentication != nil {
+		r.Mount("/api/v1/auth", http.StripPrefix("/api/v1/auth", authentication))
+	}
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(logger, w, http.StatusNotFound, "not_found", "Resource not found")
 	})
