@@ -14,8 +14,8 @@ FROM users
 WHERE id = $1;
 
 -- name: CreateSession :one
-INSERT INTO sessions (user_id, family_id, token_hash, expires_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO sessions (id, user_id, family_id, token_hash, expires_at)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, user_id, family_id, token_hash, expires_at, revoked_at, replaced_by, created_at;
 
 -- name: GetSessionByTokenHashForUpdate :one

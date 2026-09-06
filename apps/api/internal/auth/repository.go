@@ -12,6 +12,7 @@ import (
 )
 
 type Repository struct {
+	pool    *pgxpool.Pool
 	queries *database.Queries
 }
 
@@ -31,7 +32,7 @@ type StoredUser struct {
 }
 
 func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{queries: database.New(pool)}
+	return &Repository{pool: pool, queries: database.New(pool)}
 }
 
 func (r *Repository) CreateUser(ctx context.Context, input CreateUserInput) (StoredUser, error) {

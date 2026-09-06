@@ -14,12 +14,13 @@ import (
 )
 
 const createSession = `-- name: CreateSession :one
-INSERT INTO sessions (user_id, family_id, token_hash, expires_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO sessions (id, user_id, family_id, token_hash, expires_at)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, user_id, family_id, token_hash, expires_at, revoked_at, replaced_by, created_at
 `
 
 type CreateSessionParams struct {
+	ID        uuid.UUID
 	UserID    uuid.UUID
 	FamilyID  uuid.UUID
 	TokenHash []byte
@@ -28,6 +29,7 @@ type CreateSessionParams struct {
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
 	row := q.db.QueryRow(ctx, createSession,
+		arg.ID,
 		arg.UserID,
 		arg.FamilyID,
 		arg.TokenHash,
