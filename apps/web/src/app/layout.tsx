@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/features/auth/auth-context";
 
 export const metadata: Metadata = {
   title: "Taskline",
@@ -12,7 +13,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased"><AuthProvider>{children}</AuthProvider></body>
     </html>
   );
 }
