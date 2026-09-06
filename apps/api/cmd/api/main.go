@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"taskline/apps/api/internal/auth"
 	"taskline/apps/api/internal/platform/config"
 	"taskline/apps/api/internal/platform/database"
 	httpserver "taskline/apps/api/internal/platform/http"
@@ -36,9 +37,10 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("create database pool: %w", err)
 	}
 	defer pool.Close()
+	authentication := auth.NewHandler(logger, auth.NewService(auth.NewRepository(pool), auth.NewTokenManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.JWTAudience, time.Now), time.Now), cfg.Auth)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.NewRouter(logger, pool),
+		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes()),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

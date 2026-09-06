@@ -55,6 +55,14 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (StoredU
 	return storedUser(user), nil
 }
 
+func (r *Repository) FindUserByID(ctx context.Context, id uuid.UUID) (StoredUser, error) {
+	user, err := r.queries.GetUserByID(ctx, id)
+	if err != nil {
+		return StoredUser{}, fmt.Errorf("find user by ID: %w", err)
+	}
+	return storedUser(user), nil
+}
+
 func storedUser(user database.User) StoredUser {
 	return StoredUser{
 		ID:           user.ID,

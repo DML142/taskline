@@ -18,7 +18,7 @@ func (p fakePinger) Ping(context.Context) error { return p.err }
 
 func TestRouter(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	router := NewRouter(logger, fakePinger{})
+	router := NewRouter(logger, fakePinger{}, nil)
 	for _, tt := range []struct {
 		name, method, path, body string
 		status                   int
@@ -43,7 +43,7 @@ func TestRouterReady(t *testing.T) {
 
 	t.Run("returns ok when database is reachable", func(t *testing.T) {
 		response := httptest.NewRecorder()
-		NewRouter(logger, fakePinger{}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/ready", nil))
+		NewRouter(logger, fakePinger{}, nil).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/ready", nil))
 
 		require.Equal(t, http.StatusOK, response.Code)
 		require.Equal(t, "application/json", response.Header().Get("Content-Type"))
@@ -54,7 +54,7 @@ func TestRouterReady(t *testing.T) {
 
 	t.Run("reports database unavailable when ping fails", func(t *testing.T) {
 		response := httptest.NewRecorder()
-		NewRouter(logger, fakePinger{err: errors.New("connection refused")}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/ready", nil))
+		NewRouter(logger, fakePinger{err: errors.New("connection refused")}, nil).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/ready", nil))
 
 		require.Equal(t, http.StatusServiceUnavailable, response.Code)
 		require.Equal(t, "application/json", response.Header().Get("Content-Type"))
@@ -65,7 +65,7 @@ func TestRouterReady(t *testing.T) {
 
 	t.Run("health remains live when database ping fails", func(t *testing.T) {
 		response := httptest.NewRecorder()
-		NewRouter(logger, fakePinger{err: errors.New("connection refused")}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
+		NewRouter(logger, fakePinger{err: errors.New("connection refused")}, nil).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
 
 		require.Equal(t, http.StatusOK, response.Code)
 		require.JSONEq(t, `{"status":"ok"}`, response.Body.String())

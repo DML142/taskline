@@ -107,6 +107,25 @@ func (s *Service) Refresh(ctx context.Context, token string) (Authentication, er
 	return authentication, nil
 }
 
+func (s *Service) CurrentUser(ctx context.Context, accessToken string) (StoredUser, error) {
+	claims, err := s.tokens.ParseAccessToken(accessToken)
+	if err != nil {
+		return StoredUser{}, ErrUnauthenticated
+	}
+	user, err := s.repository.FindUserByID(ctx, claims.UserID)
+	if err != nil {
+		return StoredUser{}, ErrUnauthenticated
+	}
+	return user, nil
+}
+
+func (s *Service) Logout(ctx context.Context, refreshToken string) error {
+	if refreshToken == "" {
+		return nil
+	}
+	return s.repository.queries.RevokeSessionByTokenHash(ctx, HashRefreshToken(refreshToken))
+}
+
 func (s *Service) newAuthentication(ctx context.Context, q *database.Queries, user StoredUser, familyID uuid.UUID) (Authentication, error) {
 	refreshToken, err := NewRefreshToken()
 	if err != nil {
