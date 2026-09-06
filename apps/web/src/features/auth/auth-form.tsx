@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useAuth } from "@/features/auth/auth-context";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
@@ -10,10 +10,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  async function submit(form: FormData) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setPending(true);
     setError(null);
     try {
+      const form = new FormData(event.currentTarget);
       const email = String(form.get("email") ?? "");
       const password = String(form.get("password") ?? "");
       if (mode === "register")
@@ -28,7 +30,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   }
   return (
     <main className="mx-auto flex min-h-dvh max-w-md items-center px-6">
-      <form action={submit} className="w-full space-y-4 rounded-lg border p-6">
+      <form
+        onSubmit={submit}
+        className="w-full space-y-4 rounded-lg border p-6"
+      >
         <h1 className="text-xl font-semibold">
           {mode === "login" ? "Sign in" : "Create account"}
         </h1>
