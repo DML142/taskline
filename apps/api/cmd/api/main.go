@@ -15,6 +15,7 @@ import (
 	"taskline/apps/api/internal/platform/config"
 	"taskline/apps/api/internal/platform/database"
 	httpserver "taskline/apps/api/internal/platform/http"
+	"taskline/apps/api/internal/workspace"
 )
 
 func main() {
@@ -37,10 +38,12 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("create database pool: %w", err)
 	}
 	defer pool.Close()
-	authentication := auth.NewHandler(logger, auth.NewService(auth.NewRepository(pool), auth.NewTokenManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.JWTAudience, time.Now), time.Now), cfg.Auth)
+	authService := auth.NewService(auth.NewRepository(pool), auth.NewTokenManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.JWTAudience, time.Now), time.Now)
+	authentication := auth.NewHandler(logger, authService, cfg.Auth)
+	workspaces := workspace.NewHandler(workspace.NewService(workspace.NewRepository(pool)), authService)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes()),
+		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

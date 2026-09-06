@@ -84,3 +84,16 @@ func TestRouterMountsAuthenticationRoutesBelowAPIPrefix(t *testing.T) {
 
 	require.Equal(t, http.StatusCreated, response.Code)
 }
+
+func TestRouterMountsWorkspaceRoutesBelowAPIPrefix(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	workspaces := http.NewServeMux()
+	workspaces.HandleFunc("GET /", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	response := httptest.NewRecorder()
+
+	NewRouter(logger, fakePinger{}, nil, workspaces).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/workspaces", nil))
+
+	require.Equal(t, http.StatusNoContent, response.Code)
+}

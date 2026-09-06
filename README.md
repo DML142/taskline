@@ -2,7 +2,7 @@
 
 Issue tracking and project management application built with Go, PostgreSQL and Next.js.
 
-The repository includes email/password authentication, session rotation and a protected application shell. Workspaces, projects and issues are planned.
+The repository includes email/password authentication, session rotation, workspaces and role-based workspace membership. Projects and issues are planned.
 
 ## Stack
 
@@ -73,6 +73,17 @@ After changing SQL queries or migrations, regenerate the checked-in database pac
 
 ```sh
 go tool sqlc generate
+```
+
+## Workspaces
+
+Authenticated users can create and list their workspaces. Each creator is an `OWNER`; workspace members have one of `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` roles. Every member can read the workspace and its member list. In this phase, only owners can rename or delete a workspace, or add and remove members. Members must already have an account; invitations and ownership transfer are not implemented.
+
+Workspace routes are protected by bearer access tokens under `/api/v1/workspaces`. Apply migrations explicitly before using them:
+
+```sh
+cd apps/api
+go run ./cmd/migrate up
 ```
 
 ## Checks

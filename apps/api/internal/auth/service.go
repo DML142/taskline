@@ -108,14 +108,11 @@ func (s *Service) Refresh(ctx context.Context, token string) (Authentication, er
 }
 
 func (s *Service) CurrentUser(ctx context.Context, accessToken string) (StoredUser, error) {
-	claims, err := s.tokens.ParseAccessToken(accessToken)
+	identity, err := s.authenticate(ctx, accessToken)
 	if err != nil {
 		return StoredUser{}, ErrUnauthenticated
 	}
-	if !s.repository.HasActiveSession(ctx, claims.SessionID, claims.UserID) {
-		return StoredUser{}, ErrUnauthenticated
-	}
-	user, err := s.repository.FindUserByID(ctx, claims.UserID)
+	user, err := s.repository.FindUserByID(ctx, identity.UserID)
 	if err != nil {
 		return StoredUser{}, ErrUnauthenticated
 	}

@@ -14,7 +14,7 @@ type Pinger interface {
 	Ping(context.Context) error
 }
 
-func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handler) http.Handler {
+func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handler, workspaces ...http.Handler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(func(next http.Handler) http.Handler {
@@ -67,6 +67,16 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 	})
 	if authentication != nil {
 		r.Mount("/api/v1/auth", http.StripPrefix("/api/v1/auth", authentication))
+	}
+	if len(workspaces) > 0 && workspaces[0] != nil {
+		workspaceRoutes := http.StripPrefix("/api/v1/workspaces", workspaces[0])
+		workspaceRoot := http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+			request.URL.Path = "/"
+			workspaces[0].ServeHTTP(w, request)
+		})
+		r.Method(http.MethodGet, "/api/v1/workspaces", workspaceRoot)
+		r.Method(http.MethodPost, "/api/v1/workspaces", workspaceRoot)
+		r.Mount("/api/v1/workspaces/", workspaceRoutes)
 	}
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(logger, w, http.StatusNotFound, "not_found", "Resource not found")
