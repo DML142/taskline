@@ -22,8 +22,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         await register(String(form.get("name") ?? ""), email, password);
       else await login(email, password);
       router.replace("/");
-    } catch {
-      setError("Unable to sign in with those details.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to complete authentication.",
+      );
     } finally {
       setPending(false);
     }

@@ -5,7 +5,7 @@ type Fetcher = typeof fetch;
 export class AuthApi {
   constructor(
     private readonly baseURL: string,
-    private readonly fetcher: Fetcher = fetch,
+    private readonly fetcher: Fetcher = (...args) => fetch(...args),
   ) {}
 
   async me(accessToken: string): Promise<User> {
