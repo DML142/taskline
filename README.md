@@ -2,7 +2,7 @@
 
 Issue tracking and project management application built with Go, PostgreSQL and Next.js.
 
-The repository currently contains an API health endpoint and a minimal application shell. Authentication, workspaces, projects and issues are planned.
+The repository includes email/password authentication, session rotation and a protected application shell. Workspaces, projects and issues are planned.
 
 ## Stack
 
@@ -28,6 +28,7 @@ Start the API in a separate terminal:
 ```sh
 cd apps/api
 export DATABASE_URL='postgres://taskline:taskline-local@127.0.0.1:5432/taskline?sslmode=disable'
+export JWT_SECRET='replace-this-with-a-random-secret-of-at-least-32-bytes'
 go run ./cmd/migrate up
 go run ./cmd/api
 ```
@@ -40,7 +41,7 @@ Start the frontend from the repository root:
 pnpm dev
 ```
 
-Open http://localhost:3000. The frontend shell currently runs independently of the API.
+Open http://localhost:3000 and create an account. The frontend communicates directly with the API at `http://localhost:8080/api/v1` by default.
 
 ```sh
 curl http://127.0.0.1:8080/api/v1/health
@@ -53,15 +54,20 @@ Both endpoints return `{"status":"ok"}` when successful. `/api/v1/health` report
 
 Root `.env` configures Compose only: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` and `POSTGRES_PORT`. The example password is for local development only. PostgreSQL binds to loopback and persists data in the `taskline_postgres_data` volume.
 
-The API reads `DATABASE_URL` and `HTTP_ADDR` from the process environment; it does not load dotenv files. `DATABASE_URL` is required, while `HTTP_ADDR` defaults to `127.0.0.1:8080`. See `apps/api/.env.example`. Export the database URL before running either the API or migration command:
+The API reads `DATABASE_URL`, `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`, `WEB_ORIGIN`, `COOKIE_SECURE` and `HTTP_ADDR` from the process environment; it does not load dotenv files. `DATABASE_URL` and a `JWT_SECRET` of at least 32 bytes are required. `HTTP_ADDR` defaults to `127.0.0.1:8080`, `JWT_ISSUER` to `taskline-api`, `JWT_AUDIENCE` to `taskline-web`, `WEB_ORIGIN` to `http://localhost:3000`, and `COOKIE_SECURE` to `false`. See `apps/api/.env.example`.
 
 ```sh
 cd apps/api
 export DATABASE_URL='postgres://taskline:taskline-local@127.0.0.1:5432/taskline?sslmode=disable'
+export JWT_SECRET='replace-this-with-a-random-secret-of-at-least-32-bytes'
 HTTP_ADDR=127.0.0.1:9090 go run ./cmd/api
 ```
 
-No frontend environment variables are required yet.
+Set `NEXT_PUBLIC_API_URL` only when the API is not at `http://localhost:8080/api/v1`.
+
+## Authentication
+
+`POST /api/v1/auth/register`, `/login`, `/refresh` and `/logout` manage short-lived access JWTs and rotated HttpOnly refresh sessions. `GET /api/v1/auth/me` requires a bearer access token. Password reset, email verification, OAuth and MFA are not part of this phase.
 
 After changing SQL queries or migrations, regenerate the checked-in database package from `apps/api` with the pinned sqlc tool:
 

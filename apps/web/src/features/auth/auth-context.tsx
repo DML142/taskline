@@ -12,18 +12,44 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
-const api = new AuthApi(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1");
+const api = new AuthApi(
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1",
+);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
-  useEffect(() => { api.refresh().then((result) => setUser(result.user)).catch(() => setUser(null)).finally(() => setReady(true)); }, []);
-  const value = useMemo<AuthState>(() => ({ user, ready,
-    async login(email, password) { const result = await api.login(email, password); setUser(result.user); },
-    async register(name, email, password) { const result = await api.register(name, email, password); setUser(result.user); },
-    async logout() { await api.logout(); setUser(null); },
-  }), [ready, user]);
+  useEffect(() => {
+    api
+      .refresh()
+      .then((result) => setUser(result.user))
+      .catch(() => setUser(null))
+      .finally(() => setReady(true));
+  }, []);
+  const value = useMemo<AuthState>(
+    () => ({
+      user,
+      ready,
+      async login(email, password) {
+        const result = await api.login(email, password);
+        setUser(result.user);
+      },
+      async register(name, email, password) {
+        const result = await api.register(name, email, password);
+        setUser(result.user);
+      },
+      async logout() {
+        await api.logout();
+        setUser(null);
+      },
+    }),
+    [ready, user],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error("useAuth must be used within AuthProvider"); return value; }
+export function useAuth() {
+  const value = useContext(AuthContext);
+  if (!value) throw new Error("useAuth must be used within AuthProvider");
+  return value;
+}

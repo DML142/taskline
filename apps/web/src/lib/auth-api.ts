@@ -27,7 +27,11 @@ export class AuthApi {
     return response.json() as Promise<Authentication>;
   }
 
-  async register(name: string, email: string, password: string): Promise<Authentication> {
+  async register(
+    name: string,
+    email: string,
+    password: string,
+  ): Promise<Authentication> {
     return this.credentials("/auth/register", { name, email, password });
   }
 
@@ -36,11 +40,22 @@ export class AuthApi {
   }
 
   async logout(): Promise<void> {
-    await this.fetcher(`${this.baseURL}/auth/logout`, { method: "POST", credentials: "include" });
+    await this.fetcher(`${this.baseURL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
   }
 
-  private async credentials(path: string, body: Record<string, string>): Promise<Authentication> {
-    const response = await this.fetcher(`${this.baseURL}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  private async credentials(
+    path: string,
+    body: Record<string, string>,
+  ): Promise<Authentication> {
+    const response = await this.fetcher(`${this.baseURL}${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
     if (!response.ok) throw new Error("Authentication failed");
     return response.json() as Promise<Authentication>;
   }
