@@ -23,7 +23,8 @@ export class AuthApi {
       method: "POST",
       credentials: "include",
     });
-    if (!response.ok) throw new Error("Authentication required");
+    if (!response.ok)
+      throw await responseError(response, "Authentication required");
     return response.json() as Promise<Authentication>;
   }
 
@@ -56,7 +57,8 @@ export class AuthApi {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error("Authentication failed");
+    if (!response.ok)
+      throw await responseError(response, "Authentication failed");
     return response.json() as Promise<Authentication>;
   }
 
@@ -66,4 +68,11 @@ export class AuthApi {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
   }
+}
+
+async function responseError(response: Response, fallback: string) {
+  const body = (await response.json().catch(() => null)) as {
+    error?: { message?: string };
+  } | null;
+  return new Error(body?.error?.message ?? fallback);
 }
