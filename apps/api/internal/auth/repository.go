@@ -63,6 +63,11 @@ func (r *Repository) FindUserByID(ctx context.Context, id uuid.UUID) (StoredUser
 	return storedUser(user), nil
 }
 
+func (r *Repository) HasActiveSession(ctx context.Context, sessionID, userID uuid.UUID) bool {
+	active, err := r.queries.HasActiveSession(ctx, database.HasActiveSessionParams{ID: sessionID, UserID: userID})
+	return err == nil && active
+}
+
 func storedUser(user database.User) StoredUser {
 	return StoredUser{
 		ID:           user.ID,

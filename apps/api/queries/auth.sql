@@ -13,6 +13,12 @@ SELECT id, email, name, password_hash, created_at, updated_at
 FROM users
 WHERE id = $1;
 
+-- name: HasActiveSession :one
+SELECT EXISTS (
+    SELECT 1 FROM sessions
+    WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()
+);
+
 -- name: CreateSession :one
 INSERT INTO sessions (id, user_id, family_id, token_hash, expires_at)
 VALUES ($1, $2, $3, $4, $5)
