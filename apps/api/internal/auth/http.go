@@ -38,32 +38,34 @@ type credentialsRequest struct {
 }
 
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
-	if !h.limiter.allow(r) {
-		writeAuthError(w, http.StatusTooManyRequests, "rate_limited", "Too many authentication attempts")
-		return
-	}
 	var in credentialsRequest
 	if !decodeJSON(w, r, &in) {
 		return
 	}
+	if !h.limiter.allow(r, "register", in.Email) {
+		writeAuthError(w, http.StatusTooManyRequests, "rate_limited", "Too many authentication attempts")
+		return
+	}
 	result, err := h.service.Register(r.Context(), RegisterInput{Name: in.Name, Email: in.Email, Password: in.Password})
 	if err != nil {
+		h.limiter.recordFailure(r, "register", in.Email)
 		writeAuthError(w, http.StatusBadRequest, "invalid_request", "Invalid registration details")
 		return
 	}
 	h.writeAuthentication(w, result, http.StatusCreated)
 }
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
-	if !h.limiter.allow(r) {
-		writeAuthError(w, http.StatusTooManyRequests, "rate_limited", "Too many authentication attempts")
-		return
-	}
 	var in credentialsRequest
 	if !decodeJSON(w, r, &in) {
 		return
 	}
+	if !h.limiter.allow(r, "login", in.Email) {
+		writeAuthError(w, http.StatusTooManyRequests, "rate_limited", "Too many authentication attempts")
+		return
+	}
 	result, err := h.service.Login(r.Context(), LoginInput{Email: in.Email, Password: in.Password})
 	if err != nil {
+		h.limiter.recordFailure(r, "login", in.Email)
 		writeAuthError(w, http.StatusUnauthorized, "invalid_credentials", "Invalid email or password")
 		return
 	}
@@ -72,31 +74,58 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 type authRateLimiter struct {
 	mu      sync.Mutex
-	entries map[string]time.Time
+	entries map[string][]time.Time
 	window  time.Duration
 }
 
+const maxRateLimitKeys = 1024
+
 func newAuthRateLimiter(window time.Duration) *authRateLimiter {
-	return &authRateLimiter{entries: map[string]time.Time{}, window: window}
+	return &authRateLimiter{entries: map[string][]time.Time{}, window: window}
 }
-func (l *authRateLimiter) allow(r *http.Request) bool {
+func (l *authRateLimiter) allow(r *http.Request, endpoint, email string) bool {
+	key := rateLimitKey(r, endpoint, email)
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.prune(now)
+	return len(l.entries[key]) < 5
+}
+
+func (l *authRateLimiter) recordFailure(r *http.Request, endpoint, email string) {
+	key := rateLimitKey(r, endpoint, email)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	l.prune(now)
+	if _, exists := l.entries[key]; !exists && len(l.entries) >= maxRateLimitKeys {
+		return
+	}
+	l.entries[key] = append(l.entries[key], now)
+}
+
+func (l *authRateLimiter) prune(now time.Time) {
+	for key, attempts := range l.entries {
+		kept := attempts[:0]
+		for _, attempt := range attempts {
+			if now.Sub(attempt) < l.window {
+				kept = append(kept, attempt)
+			}
+		}
+		if len(kept) == 0 {
+			delete(l.entries, key)
+		} else {
+			l.entries[key] = kept
+		}
+	}
+}
+
+func rateLimitKey(r *http.Request, endpoint, email string) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		host = r.RemoteAddr
 	}
-	now := time.Now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	for key, until := range l.entries {
-		if !until.After(now) {
-			delete(l.entries, key)
-		}
-	}
-	if until := l.entries[host]; until.After(now) {
-		return false
-	}
-	l.entries[host] = now.Add(l.window)
-	return true
+	return strings.Join([]string{host, endpoint}, "\x00")
 }
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("taskline_refresh")

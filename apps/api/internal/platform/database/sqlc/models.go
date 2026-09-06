@@ -5,11 +5,57 @@
 package database
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type WorkspaceRole string
+
+const (
+	WorkspaceRoleOWNER  WorkspaceRole = "OWNER"
+	WorkspaceRoleADMIN  WorkspaceRole = "ADMIN"
+	WorkspaceRoleMEMBER WorkspaceRole = "MEMBER"
+	WorkspaceRoleVIEWER WorkspaceRole = "VIEWER"
+)
+
+func (e *WorkspaceRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = WorkspaceRole(s)
+	case string:
+		*e = WorkspaceRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for WorkspaceRole: %T", src)
+	}
+	return nil
+}
+
+type NullWorkspaceRole struct {
+	WorkspaceRole WorkspaceRole
+	Valid         bool // Valid is true if WorkspaceRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullWorkspaceRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.WorkspaceRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.WorkspaceRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullWorkspaceRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.WorkspaceRole), nil
+}
 
 type Session struct {
 	ID         uuid.UUID
@@ -29,4 +75,18 @@ type User struct {
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type Workspace struct {
+	ID        uuid.UUID
+	Name      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type WorkspaceMember struct {
+	WorkspaceID uuid.UUID
+	UserID      uuid.UUID
+	Role        WorkspaceRole
+	CreatedAt   time.Time
 }

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FolderKanban, Layers, LayoutDashboard } from "lucide-react";
+import { Layers, LayoutDashboard } from "lucide-react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/features/auth/auth-context";
+import { WorkspaceOverview } from "@/features/workspaces/workspace-overview";
 
 export default function Home() {
   const { ready, user, logout } = useAuth();
@@ -13,12 +14,13 @@ export default function Home() {
   useEffect(() => {
     if (ready && !user) router.replace("/login");
   }, [ready, router, user]);
-  if (!ready || !user)
+  if (!ready || !user) {
     return (
       <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">
         Checking your session…
       </main>
     );
+  }
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[220px_1fr]">
       <a
@@ -45,14 +47,6 @@ export default function Home() {
             Overview
           </Link>
         </nav>
-        <div className="mt-8 hidden px-3 md:block">
-          <p className="text-xs font-medium text-muted-foreground">
-            Workspaces
-          </p>
-          <p className="mt-3 text-sm text-muted-foreground">
-            No workspace selected
-          </p>
-        </div>
       </aside>
       <main id="main" tabIndex={-1} className="min-w-0">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
@@ -64,29 +58,7 @@ export default function Home() {
             </button>
           </div>
         </header>
-        <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
-          <h2 className="text-xl font-semibold tracking-tight">
-            Your workspace
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            A shared place for projects and issues.
-          </p>
-          <section
-            aria-labelledby="workspace-heading"
-            className="mt-8 flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed px-6 py-12 text-center"
-          >
-            <FolderKanban
-              aria-hidden="true"
-              className="mb-4 size-7 text-muted-foreground"
-            />
-            <h3 id="workspace-heading" className="text-sm font-medium">
-              Projects will live here
-            </h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              Workspace and project management are not available yet.
-            </p>
-          </section>
-        </div>
+        <WorkspaceOverview />
       </main>
     </div>
   );
