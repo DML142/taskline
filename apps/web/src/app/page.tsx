@@ -1,8 +1,17 @@
+"use client";
+
 import Link from "next/link";
 import { FolderKanban, Layers, LayoutDashboard } from "lucide-react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/features/auth/auth-context";
 
 export default function Home() {
+  const { ready, user, logout } = useAuth();
+  const router = useRouter();
+  useEffect(() => { if (ready && !user) router.replace("/login"); }, [ready, router, user]);
+  if (!ready || !user) return <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">Checking your session…</main>;
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[220px_1fr]">
       <a
@@ -41,7 +50,7 @@ export default function Home() {
       <main id="main" tabIndex={-1} className="min-w-0">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
           <h1 className="text-sm font-medium">Overview</h1>
-          <Badge variant="outline">Early development</Badge>
+          <div className="flex items-center gap-3"><Badge variant="outline">{user.name}</Badge><button onClick={() => void logout()} className="text-sm underline">Sign out</button></div>
         </header>
         <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
           <h2 className="text-xl font-semibold tracking-tight">
