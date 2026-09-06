@@ -159,6 +159,25 @@ func (q *Queries) GetUserForSession(ctx context.Context, id uuid.UUID) (User, er
 	return i, err
 }
 
+const hasActiveSession = `-- name: HasActiveSession :one
+SELECT EXISTS (
+    SELECT 1 FROM sessions
+    WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()
+)
+`
+
+type HasActiveSessionParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) HasActiveSession(ctx context.Context, arg HasActiveSessionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasActiveSession, arg.ID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const revokeSession = `-- name: RevokeSession :exec
 UPDATE sessions
 SET revoked_at = now(), replaced_by = $2

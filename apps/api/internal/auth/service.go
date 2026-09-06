@@ -112,6 +112,9 @@ func (s *Service) CurrentUser(ctx context.Context, accessToken string) (StoredUs
 	if err != nil {
 		return StoredUser{}, ErrUnauthenticated
 	}
+	if !s.repository.HasActiveSession(ctx, claims.SessionID, claims.UserID) {
+		return StoredUser{}, ErrUnauthenticated
+	}
 	user, err := s.repository.FindUserByID(ctx, claims.UserID)
 	if err != nil {
 		return StoredUser{}, ErrUnauthenticated
