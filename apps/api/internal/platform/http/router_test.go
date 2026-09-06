@@ -71,3 +71,16 @@ func TestRouterReady(t *testing.T) {
 		require.JSONEq(t, `{"status":"ok"}`, response.Body.String())
 	})
 }
+
+func TestRouterMountsAuthenticationRoutesBelowAPIPrefix(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	authentication := http.NewServeMux()
+	authentication.HandleFunc("POST /register", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	})
+	response := httptest.NewRecorder()
+
+	NewRouter(logger, fakePinger{}, authentication).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", nil))
+
+	require.Equal(t, http.StatusCreated, response.Code)
+}

@@ -66,7 +66,7 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 		}
 	})
 	if authentication != nil {
-		r.Mount("/api/v1/auth", authentication)
+		r.Mount("/api/v1/auth", http.StripPrefix("/api/v1/auth", authentication))
 	}
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(logger, w, http.StatusNotFound, "not_found", "Resource not found")
