@@ -2,7 +2,7 @@
 
 Issue tracking and project management application built with Go, PostgreSQL and Next.js.
 
-The repository includes email/password authentication, session rotation, workspaces, role-based workspace membership and projects. Issues are planned.
+The repository includes email/password authentication, session rotation, workspaces, role-based workspace membership, projects, and project issues.
 
 ## Stack
 
@@ -97,6 +97,19 @@ GET  /api/v1/projects/{workspaceUUID}
 POST /api/v1/projects/{workspaceUUID}
 GET  /api/v1/projects/{workspaceUUID}/{projectSlug}
 PATCH /api/v1/projects/{workspaceUUID}/{projectSlug}
+```
+
+## Issues
+
+Projects contain issues with a title, description, status (`TODO`, `IN_PROGRESS`, or `DONE`), priority (`LOW`, `MEDIUM`, or `HIGH`), creator, and optional assignee. Owners and admins can manage every issue. Members can create issues and update issues assigned to themselves; viewers can read only. Assignees must be workspace members; removing a member automatically clears their issue assignments.
+
+Issue routes use a workspace UUID and project slug. The list endpoint supports optional `status` and `assigneeId` filters:
+
+```text
+GET   /api/v1/issues/{workspaceUUID}/{projectSlug}?status=TODO&assigneeId={userUUID}
+POST  /api/v1/issues/{workspaceUUID}/{projectSlug}
+GET   /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}
+PATCH /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}
 ```
 
 ## Checks

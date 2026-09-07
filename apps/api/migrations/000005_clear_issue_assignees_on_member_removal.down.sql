@@ -1,0 +1,2 @@
+DROP TRIGGER workspace_member_issue_assignee_cleanup ON workspace_members;
+DROP FUNCTION clear_issue_assignees_on_member_removal();
