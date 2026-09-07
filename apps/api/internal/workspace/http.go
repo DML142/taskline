@@ -209,6 +209,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "forbidden", "You do not have permission to do that")
 	case errors.Is(err, ErrMemberExists):
 		writeError(w, http.StatusConflict, "member_exists", "User is already a member")
+	case errors.Is(err, ErrSlugExists):
+		writeError(w, http.StatusConflict, "workspace_slug_exists", "A workspace with this URL name already exists")
 	case errors.Is(err, ErrUserNotFound):
 		writeError(w, http.StatusNotFound, "user_not_found", "User not found")
 	case errors.Is(err, ErrInvalidRequest):

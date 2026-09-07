@@ -3,6 +3,7 @@ export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
 export type Workspace = {
   id: string;
   name: string;
+  slug: string;
   createdAt: string;
   updatedAt: string;
 };

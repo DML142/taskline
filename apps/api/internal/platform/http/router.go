@@ -78,6 +78,10 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 		r.Method(http.MethodPost, "/api/v1/workspaces", workspaceRoot)
 		r.Mount("/api/v1/workspaces/", workspaceRoutes)
 	}
+	if len(workspaces) > 1 && workspaces[1] != nil {
+		projectRoutes := http.StripPrefix("/api/v1/projects", workspaces[1])
+		r.Mount("/api/v1/projects/", projectRoutes)
+	}
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(logger, w, http.StatusNotFound, "not_found", "Resource not found")
 	})

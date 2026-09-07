@@ -17,6 +17,7 @@ var (
 	ErrInvalidRequest    = errors.New("invalid request")
 	ErrMemberExists      = errors.New("member exists")
 	ErrUserNotFound      = errors.New("user not found")
+	ErrSlugExists        = errors.New("workspace slug exists")
 )
 
 type Service struct{ repository *Repository }
@@ -24,14 +25,33 @@ type Service struct{ repository *Repository }
 func NewService(repository *Repository) *Service { return &Service{repository: repository} }
 
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, name string) (WorkspaceSummary, error) {
-	if !validName(name) {
+	if !validName(name) || !validSlug(slugFromName(name)) {
 		return WorkspaceSummary{}, ErrInvalidRequest
 	}
 	workspace, err := s.repository.CreateWithOwner(ctx, userID, name)
+	if uniqueViolation(err) {
+		return WorkspaceSummary{}, ErrSlugExists
+	}
 	if err != nil {
 		return WorkspaceSummary{}, err
 	}
 	return WorkspaceSummary{Workspace: workspace, Role: RoleOwner}, nil
+}
+
+func validSlug(slug string) bool {
+	if len(slug) < 2 || len(slug) > 80 || slug[0] == '-' || slug[len(slug)-1] == '-' {
+		return false
+	}
+	for index, character := range slug {
+		if (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') {
+			continue
+		}
+		if character == '-' && index > 0 && index < len(slug)-1 && slug[index-1] != '-' && slug[index+1] != '-' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]WorkspaceSummary, error) {

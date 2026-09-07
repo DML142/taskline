@@ -15,6 +15,7 @@ import (
 	"taskline/apps/api/internal/platform/config"
 	"taskline/apps/api/internal/platform/database"
 	httpserver "taskline/apps/api/internal/platform/http"
+	"taskline/apps/api/internal/project"
 	"taskline/apps/api/internal/workspace"
 )
 
@@ -41,9 +42,10 @@ func run(logger *slog.Logger) error {
 	authService := auth.NewService(auth.NewRepository(pool), auth.NewTokenManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.JWTAudience, time.Now), time.Now)
 	authentication := auth.NewHandler(logger, authService, cfg.Auth)
 	workspaces := workspace.NewHandler(workspace.NewService(workspace.NewRepository(pool)), authService)
+	projects := project.NewHandler(project.NewService(project.NewRepository(pool)), authService)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces),
+		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces, projects),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

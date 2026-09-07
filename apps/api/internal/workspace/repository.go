@@ -25,6 +25,7 @@ const (
 type Workspace struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -60,7 +61,7 @@ func (r *Repository) CreateWithOwner(ctx context.Context, ownerID uuid.UUID, nam
 	}
 	defer tx.Rollback(ctx)
 	queries := database.New(tx)
-	workspace, err := queries.CreateWorkspace(ctx, strings.TrimSpace(name))
+	workspace, err := queries.CreateWorkspace(ctx, database.CreateWorkspaceParams{Name: strings.TrimSpace(name), Slug: slugFromName(name)})
 	if err != nil {
 		return Workspace{}, fmt.Errorf("create workspace: %w", err)
 	}
@@ -74,7 +75,7 @@ func (r *Repository) CreateWithOwner(ctx context.Context, ownerID uuid.UUID, nam
 	if err := tx.Commit(ctx); err != nil {
 		return Workspace{}, fmt.Errorf("commit workspace transaction: %w", err)
 	}
-	return Workspace{ID: workspace.ID, Name: workspace.Name, CreatedAt: workspace.CreatedAt, UpdatedAt: workspace.UpdatedAt}, nil
+	return Workspace{ID: workspace.ID, Name: workspace.Name, Slug: workspace.Slug, CreatedAt: workspace.CreatedAt, UpdatedAt: workspace.UpdatedAt}, nil
 }
 
 func (r *Repository) GetMember(ctx context.Context, workspaceID, userID uuid.UUID) (Membership, error) {
@@ -92,7 +93,7 @@ func (r *Repository) ListForUser(ctx context.Context, userID uuid.UUID) ([]Works
 	}
 	result := make([]WorkspaceSummary, len(rows))
 	for i, row := range rows {
-		result[i] = WorkspaceSummary{Workspace: Workspace{ID: row.ID, Name: row.Name, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, Role: Role(row.Role)}
+		result[i] = WorkspaceSummary{Workspace: Workspace{ID: row.ID, Name: row.Name, Slug: row.Slug, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, Role: Role(row.Role)}
 	}
 	return result, nil
 }
@@ -102,7 +103,7 @@ func (r *Repository) GetForMember(ctx context.Context, workspaceID, userID uuid.
 	if err != nil {
 		return WorkspaceSummary{}, fmt.Errorf("get workspace: %w", err)
 	}
-	return WorkspaceSummary{Workspace: Workspace{ID: row.ID, Name: row.Name, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, Role: Role(row.Role)}, nil
+	return WorkspaceSummary{Workspace: Workspace{ID: row.ID, Name: row.Name, Slug: row.Slug, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, Role: Role(row.Role)}, nil
 }
 
 func (r *Repository) ListMembers(ctx context.Context, workspaceID uuid.UUID) ([]Member, error) {
@@ -138,7 +139,24 @@ func (r *Repository) UpdateName(ctx context.Context, workspaceID uuid.UUID, name
 	if err != nil {
 		return Workspace{}, fmt.Errorf("update workspace name: %w", err)
 	}
-	return Workspace{ID: row.ID, Name: row.Name, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, nil
+	return Workspace{ID: row.ID, Name: row.Name, Slug: row.Slug, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, nil
+}
+
+func slugFromName(name string) string {
+	var builder strings.Builder
+	separator := false
+	for _, character := range strings.ToLower(strings.TrimSpace(name)) {
+		if (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') {
+			if separator && builder.Len() > 0 {
+				builder.WriteByte('-')
+			}
+			builder.WriteRune(character)
+			separator = false
+		} else {
+			separator = true
+		}
+	}
+	return builder.String()
 }
 
 func (r *Repository) UpdateMemberRole(ctx context.Context, workspaceID, userID uuid.UUID, role Role) (Membership, error) {

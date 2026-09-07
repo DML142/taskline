@@ -13,17 +13,31 @@ import (
 )
 
 const createWorkspace = `-- name: CreateWorkspace :one
-INSERT INTO workspaces (name)
-VALUES ($1)
-RETURNING id, name, created_at, updated_at
+INSERT INTO workspaces (name, slug)
+VALUES ($1, $2)
+RETURNING id, name, slug, created_at, updated_at
 `
 
-func (q *Queries) CreateWorkspace(ctx context.Context, name string) (Workspace, error) {
-	row := q.db.QueryRow(ctx, createWorkspace, name)
-	var i Workspace
+type CreateWorkspaceParams struct {
+	Name string
+	Slug string
+}
+
+type CreateWorkspaceRow struct {
+	ID        uuid.UUID
+	Name      string
+	Slug      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (CreateWorkspaceRow, error) {
+	row := q.db.QueryRow(ctx, createWorkspace, arg.Name, arg.Slug)
+	var i CreateWorkspaceRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -106,7 +120,7 @@ func (q *Queries) FindWorkspaceUserByEmail(ctx context.Context, email string) (U
 }
 
 const getWorkspaceForMember = `-- name: GetWorkspaceForMember :one
-SELECT w.id, w.name, w.created_at, w.updated_at, wm.role
+SELECT w.id, w.name, w.slug, w.created_at, w.updated_at, wm.role
 FROM workspaces AS w
 JOIN workspace_members AS wm ON wm.workspace_id = w.id
 WHERE w.id = $1 AND wm.user_id = $2
@@ -120,6 +134,7 @@ type GetWorkspaceForMemberParams struct {
 type GetWorkspaceForMemberRow struct {
 	ID        uuid.UUID
 	Name      string
+	Slug      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Role      WorkspaceRole
@@ -131,6 +146,7 @@ func (q *Queries) GetWorkspaceForMember(ctx context.Context, arg GetWorkspaceFor
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Role,
@@ -204,7 +220,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, workspaceID uuid.UUI
 }
 
 const listWorkspacesForUser = `-- name: ListWorkspacesForUser :many
-SELECT w.id, w.name, w.created_at, w.updated_at, wm.role
+SELECT w.id, w.name, w.slug, w.created_at, w.updated_at, wm.role
 FROM workspaces AS w
 JOIN workspace_members AS wm ON wm.workspace_id = w.id
 WHERE wm.user_id = $1
@@ -214,6 +230,7 @@ ORDER BY w.created_at, w.id
 type ListWorkspacesForUserRow struct {
 	ID        uuid.UUID
 	Name      string
+	Slug      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Role      WorkspaceRole
@@ -231,6 +248,7 @@ func (q *Queries) ListWorkspacesForUser(ctx context.Context, userID uuid.UUID) (
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
+			&i.Slug,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Role,
@@ -274,7 +292,7 @@ const updateWorkspaceName = `-- name: UpdateWorkspaceName :one
 UPDATE workspaces
 SET name = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, name, created_at, updated_at
+RETURNING id, name, slug, created_at, updated_at
 `
 
 type UpdateWorkspaceNameParams struct {
@@ -282,12 +300,21 @@ type UpdateWorkspaceNameParams struct {
 	Name string
 }
 
-func (q *Queries) UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (Workspace, error) {
+type UpdateWorkspaceNameRow struct {
+	ID        uuid.UUID
+	Name      string
+	Slug      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (UpdateWorkspaceNameRow, error) {
 	row := q.db.QueryRow(ctx, updateWorkspaceName, arg.ID, arg.Name)
-	var i Workspace
+	var i UpdateWorkspaceNameRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -2,7 +2,7 @@
 
 Issue tracking and project management application built with Go, PostgreSQL and Next.js.
 
-The repository includes email/password authentication, session rotation, workspaces and role-based workspace membership. Projects and issues are planned.
+The repository includes email/password authentication, session rotation, workspaces, role-based workspace membership and projects. Issues are planned.
 
 ## Stack
 
@@ -84,6 +84,19 @@ Workspace routes are protected by bearer access tokens under `/api/v1/workspaces
 ```sh
 cd apps/api
 go run ./cmd/migrate up
+```
+
+## Projects
+
+Each workspace and project has a human-readable, URL-safe slug. The frontend uses GitHub-style routes such as `/acme/website-redesign`; UUIDs remain the internal API identifiers. Existing workspaces receive a stable `workspace-<uuid-prefix>` slug when migration `000003_projects` is applied.
+
+Workspace `OWNER`s and `ADMIN`s can create, edit and archive projects. `MEMBER`s and `VIEWER`s can read projects. Project slug values are unique within a workspace and use lowercase letters, digits and single hyphens. The project API is protected by bearer authentication:
+
+```text
+GET  /api/v1/projects/{workspaceUUID}
+POST /api/v1/projects/{workspaceUUID}
+GET  /api/v1/projects/{workspaceUUID}/{projectSlug}
+PATCH /api/v1/projects/{workspaceUUID}/{projectSlug}
 ```
 
 ## Checks

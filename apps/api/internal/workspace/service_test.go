@@ -32,3 +32,8 @@ func TestServiceRejectsDemotingOrRemovingAnOwner(t *testing.T) {
 	require.ErrorIs(t, service.ChangeMemberRole(ctx, owner.ID, workspace.ID, owner.ID, RoleAdmin), ErrInvalidRequest)
 	require.ErrorIs(t, service.RemoveMember(ctx, owner.ID, workspace.ID, owner.ID), ErrInvalidRequest)
 }
+
+func TestSlugFromNameUsesOnlyURLSafeASCII(t *testing.T) {
+	require.Equal(t, "website-redesign", slugFromName("Website Redesign"))
+	require.Empty(t, slugFromName("Проєкт"))
+}
