@@ -94,7 +94,7 @@ export function WorkspaceOverview() {
           {workspaces.map((workspace) => (
             <li key={workspace.id}>
               <Link
-                href={`/workspaces/${workspace.id}`}
+                href={`/${workspace.slug}`}
                 className="block rounded-lg border p-4 transition-colors hover:bg-muted"
               >
                 <p className="font-medium">{workspace.name}</p>

@@ -10,6 +10,7 @@ describe("WorkspaceApi", () => {
             {
               id: "workspace-1",
               name: "Platform",
+              slug: "platform",
               role: "OWNER",
               createdAt: "2026-09-07T00:00:00Z",
               updatedAt: "2026-09-07T00:00:00Z",

@@ -1,7 +1,7 @@
 -- name: CreateWorkspace :one
-INSERT INTO workspaces (name)
-VALUES ($1)
-RETURNING id, name, created_at, updated_at;
+INSERT INTO workspaces (name, slug)
+VALUES ($1, $2)
+RETURNING id, name, slug, created_at, updated_at;
 
 -- name: CreateWorkspaceMember :one
 INSERT INTO workspace_members (workspace_id, user_id, role)
@@ -14,14 +14,14 @@ FROM workspace_members
 WHERE workspace_id = $1 AND user_id = $2;
 
 -- name: ListWorkspacesForUser :many
-SELECT w.id, w.name, w.created_at, w.updated_at, wm.role
+SELECT w.id, w.name, w.slug, w.created_at, w.updated_at, wm.role
 FROM workspaces AS w
 JOIN workspace_members AS wm ON wm.workspace_id = w.id
 WHERE wm.user_id = $1
 ORDER BY w.created_at, w.id;
 
 -- name: GetWorkspaceForMember :one
-SELECT w.id, w.name, w.created_at, w.updated_at, wm.role
+SELECT w.id, w.name, w.slug, w.created_at, w.updated_at, wm.role
 FROM workspaces AS w
 JOIN workspace_members AS wm ON wm.workspace_id = w.id
 WHERE w.id = $1 AND wm.user_id = $2;
@@ -42,7 +42,7 @@ WHERE email = $1;
 UPDATE workspaces
 SET name = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, name, created_at, updated_at;
+RETURNING id, name, slug, created_at, updated_at;
 
 -- name: UpdateWorkspaceMemberRole :one
 UPDATE workspace_members

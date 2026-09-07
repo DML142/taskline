@@ -57,6 +57,17 @@ func (ns NullWorkspaceRole) Value() (driver.Value, error) {
 	return string(ns.WorkspaceRole), nil
 }
 
+type Project struct {
+	ID          uuid.UUID
+	WorkspaceID uuid.UUID
+	Name        string
+	Slug        string
+	Description string
+	Archived    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Session struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -82,6 +93,7 @@ type Workspace struct {
 	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Slug      string
 }
 
 type WorkspaceMember struct {
