@@ -97,3 +97,16 @@ func TestRouterMountsWorkspaceRoutesBelowAPIPrefix(t *testing.T) {
 
 	require.Equal(t, http.StatusNoContent, response.Code)
 }
+
+func TestRouterMountsIssueRoutesBelowAPIPrefix(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	issues := http.NewServeMux()
+	issues.HandleFunc("GET /workspace/project", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	response := httptest.NewRecorder()
+
+	NewRouter(logger, fakePinger{}, nil, nil, nil, issues).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/issues/workspace/project", nil))
+
+	require.Equal(t, http.StatusNoContent, response.Code)
+}
