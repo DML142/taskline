@@ -76,6 +76,10 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 func writeError(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrEmailMismatch) {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": map[string]string{"code": "forbidden", "message": "You do not have permission to do that"}})
+		return
+	}
 	if errors.Is(err, ErrUnavailable) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": map[string]string{"code": "invite_not_found", "message": "Invitation is unavailable"}})
 		return

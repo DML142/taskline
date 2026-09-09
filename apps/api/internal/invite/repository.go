@@ -18,6 +18,7 @@ import (
 )
 
 var ErrUnavailable = errors.New("invite unavailable")
+var ErrEmailMismatch = errors.New("invite email mismatch")
 
 type Invite struct {
 	ID              uuid.UUID      `json:"id"`
@@ -82,7 +83,10 @@ func (r *Repository) Accept(ctx context.Context, tokenHash [sha256.Size]byte, us
 	if err != nil {
 		return workspace.Membership{}, err
 	}
-	if row.AcceptedAt.Valid || row.RevokedAt.Valid || !row.ExpiresAt.After(time.Now()) || row.Email != normalizeEmail(email) {
+	if row.Email != normalizeEmail(email) {
+		return workspace.Membership{}, ErrEmailMismatch
+	}
+	if row.AcceptedAt.Valid || row.RevokedAt.Valid || !row.ExpiresAt.After(time.Now()) {
 		return workspace.Membership{}, ErrUnavailable
 	}
 	member, err := q.CreateWorkspaceMember(ctx, database.CreateWorkspaceMemberParams{WorkspaceID: row.WorkspaceID, UserID: userID, Role: row.Role, AddedByUserID: pgtype.UUID{Bytes: row.CreatedByUserID, Valid: true}})

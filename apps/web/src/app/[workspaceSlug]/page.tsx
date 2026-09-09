@@ -244,6 +244,11 @@ export default function WorkspaceProjectsPage() {
                 <span className="block text-sm text-muted-foreground">
                   {member.email}
                 </span>
+                {canManage && member.addedByName && (
+                  <span className="block text-xs text-muted-foreground">
+                    Added by {member.addedByName}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground">
