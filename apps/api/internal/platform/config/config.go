@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/mail"
 	"net/url"
 	"os"
 	"strconv"
@@ -16,6 +17,15 @@ type Config struct {
 	HTTPAddr    string
 	DatabaseURL string
 	Auth        auth.Config
+	SMTP        SMTPConfig
+}
+
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
 }
 
 func Load() (Config, error) {
@@ -46,7 +56,36 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{HTTPAddr: addr, DatabaseURL: databaseURL, Auth: authConfig}, nil
+	smtpConfig, err := loadSMTPConfig()
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{HTTPAddr: addr, DatabaseURL: databaseURL, Auth: authConfig, SMTP: smtpConfig}, nil
+}
+
+func loadSMTPConfig() (SMTPConfig, error) {
+	host := os.Getenv("SMTP_HOST")
+	if host == "" {
+		return SMTPConfig{}, fmt.Errorf("SMTP_HOST is required")
+	}
+	port, err := strconv.Atoi(os.Getenv("SMTP_PORT"))
+	if err != nil || port < 1 || port > 65535 {
+		return SMTPConfig{}, fmt.Errorf("SMTP_PORT must be between 1 and 65535")
+	}
+	username := os.Getenv("SMTP_USERNAME")
+	if username == "" {
+		return SMTPConfig{}, fmt.Errorf("SMTP_USERNAME is required")
+	}
+	password := os.Getenv("SMTP_PASSWORD")
+	if password == "" {
+		return SMTPConfig{}, fmt.Errorf("SMTP_PASSWORD is required")
+	}
+	from := os.Getenv("SMTP_FROM")
+	parsedFrom, err := mail.ParseAddress(from)
+	if err != nil || parsedFrom.Address == "" {
+		return SMTPConfig{}, fmt.Errorf("SMTP_FROM must be a valid email address")
+	}
+	return SMTPConfig{Host: host, Port: port, Username: username, Password: password, From: from}, nil
 }
 
 func loadAuthConfig() (auth.Config, error) {
