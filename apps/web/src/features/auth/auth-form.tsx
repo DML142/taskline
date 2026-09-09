@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "@/features/auth/auth-context";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const { login, register } = useAuth();
   const router = useRouter();
+  const requestedNext = useSearchParams().get("next");
+  const next =
+    requestedNext?.startsWith("/") && !requestedNext.startsWith("//")
+      ? requestedNext
+      : "/";
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -21,7 +26,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       if (mode === "register")
         await register(String(form.get("name") ?? ""), email, password);
       else await login(email, password);
-      router.replace("/");
+      router.replace(next);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -89,11 +94,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         <p className="text-sm text-muted-foreground">
           {mode === "login" ? (
             <>
-              New here? <Link href="/register">Create an account</Link>
+              New here?{" "}
+              <Link href={`/register?next=${encodeURIComponent(next)}`}>
+                Create an account
+              </Link>
             </>
           ) : (
             <>
-              Already have an account? <Link href="/login">Sign in</Link>
+              Already have an account?{" "}
+              <Link href={`/login?next=${encodeURIComponent(next)}`}>
+                Sign in
+              </Link>
             </>
           )}
         </p>
