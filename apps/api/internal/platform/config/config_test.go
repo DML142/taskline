@@ -91,6 +91,21 @@ func TestLoadAcceptsAuthenticationConfiguration(t *testing.T) {
 	require.Equal(t, "taskline-api", cfg.Auth.JWTIssuer)
 	require.Equal(t, "taskline-web", cfg.Auth.JWTAudience)
 	require.Equal(t, "smtp.taskline.example", cfg.SMTP.Host)
+	require.Equal(t, "starttls", cfg.SMTP.TLSMode)
+}
+
+func TestLoadAcceptsLocalSMTPWithoutTLS(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
+	setValidAuthEnv(t)
+	t.Setenv("SMTP_TLS_MODE", "none")
+	t.Setenv("SMTP_USERNAME", "")
+	t.Setenv("SMTP_PASSWORD", "")
+
+	cfg, err := Load()
+
+	require.NoError(t, err)
+	require.Equal(t, "none", cfg.SMTP.TLSMode)
 }
 
 func TestLoadRequiresSMTPConfiguration(t *testing.T) {

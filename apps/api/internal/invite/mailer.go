@@ -42,14 +42,18 @@ func (m *SMTPMailer) Send(ctx context.Context, message Message) error {
 		return fmt.Errorf("create SMTP client: %w", err)
 	}
 	defer client.Quit()
-	if ok, _ := client.Extension("STARTTLS"); !ok {
-		return fmt.Errorf("SMTP server does not support STARTTLS")
+	if m.config.TLSMode == "starttls" {
+		if ok, _ := client.Extension("STARTTLS"); !ok {
+			return fmt.Errorf("SMTP server does not support STARTTLS")
+		}
+		if err := client.StartTLS(&tls.Config{ServerName: m.config.Host, MinVersion: tls.VersionTLS12}); err != nil {
+			return fmt.Errorf("start SMTP TLS: %w", err)
+		}
 	}
-	if err := client.StartTLS(&tls.Config{ServerName: m.config.Host, MinVersion: tls.VersionTLS12}); err != nil {
-		return fmt.Errorf("start SMTP TLS: %w", err)
-	}
-	if err := client.Auth(smtp.PlainAuth("", m.config.Username, m.config.Password, m.config.Host)); err != nil {
-		return fmt.Errorf("authenticate SMTP: %w", err)
+	if m.config.Username != "" || m.config.Password != "" {
+		if err := client.Auth(smtp.PlainAuth("", m.config.Username, m.config.Password, m.config.Host)); err != nil {
+			return fmt.Errorf("authenticate SMTP: %w", err)
+		}
 	}
 	from, err := mail.ParseAddress(m.config.From)
 	if err != nil {

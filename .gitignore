@@ -6,6 +6,8 @@ AGENTS.local.md
 .env
 .env.*
 !.env.example
+!apps/api/.env.local.example
+!apps/api/.env.production.example
 node_modules/
 .next/
 .worktrees/

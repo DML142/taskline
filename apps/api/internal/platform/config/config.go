@@ -26,6 +26,7 @@ type SMTPConfig struct {
 	Username string
 	Password string
 	From     string
+	TLSMode  string
 }
 
 func Load() (Config, error) {
@@ -72,12 +73,19 @@ func loadSMTPConfig() (SMTPConfig, error) {
 	if err != nil || port < 1 || port > 65535 {
 		return SMTPConfig{}, fmt.Errorf("SMTP_PORT must be between 1 and 65535")
 	}
+	tlsMode := os.Getenv("SMTP_TLS_MODE")
+	if tlsMode == "" {
+		tlsMode = "starttls"
+	}
+	if tlsMode != "starttls" && tlsMode != "none" {
+		return SMTPConfig{}, fmt.Errorf("SMTP_TLS_MODE must be starttls or none")
+	}
 	username := os.Getenv("SMTP_USERNAME")
-	if username == "" {
+	password := os.Getenv("SMTP_PASSWORD")
+	if tlsMode == "starttls" && username == "" {
 		return SMTPConfig{}, fmt.Errorf("SMTP_USERNAME is required")
 	}
-	password := os.Getenv("SMTP_PASSWORD")
-	if password == "" {
+	if tlsMode == "starttls" && password == "" {
 		return SMTPConfig{}, fmt.Errorf("SMTP_PASSWORD is required")
 	}
 	from := os.Getenv("SMTP_FROM")
@@ -85,7 +93,7 @@ func loadSMTPConfig() (SMTPConfig, error) {
 	if err != nil || parsedFrom.Address == "" {
 		return SMTPConfig{}, fmt.Errorf("SMTP_FROM must be a valid email address")
 	}
-	return SMTPConfig{Host: host, Port: port, Username: username, Password: password, From: from}, nil
+	return SMTPConfig{Host: host, Port: port, Username: username, Password: password, From: from, TLSMode: tlsMode}, nil
 }
 
 func loadAuthConfig() (auth.Config, error) {
