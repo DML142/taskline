@@ -8,6 +8,7 @@ AGENTS.local.md
 !.env.example
 node_modules/
 .next/
+.worktrees/
 out/
 dist/
 build/
