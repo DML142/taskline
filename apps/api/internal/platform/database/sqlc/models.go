@@ -109,9 +109,23 @@ type Workspace struct {
 	Slug      string
 }
 
+type WorkspaceInvite struct {
+	ID              uuid.UUID
+	WorkspaceID     uuid.UUID
+	Email           string
+	Role            WorkspaceRole
+	TokenHash       []byte
+	CreatedByUserID uuid.UUID
+	ExpiresAt       time.Time
+	AcceptedAt      pgtype.Timestamptz
+	RevokedAt       pgtype.Timestamptz
+	CreatedAt       time.Time
+}
+
 type WorkspaceMember struct {
-	WorkspaceID uuid.UUID
-	UserID      uuid.UUID
-	Role        WorkspaceRole
-	CreatedAt   time.Time
+	WorkspaceID   uuid.UUID
+	UserID        uuid.UUID
+	Role          WorkspaceRole
+	CreatedAt     time.Time
+	AddedByUserID pgtype.UUID
 }

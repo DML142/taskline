@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createWorkspace = `-- name: CreateWorkspace :one
@@ -45,24 +46,39 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 }
 
 const createWorkspaceMember = `-- name: CreateWorkspaceMember :one
-INSERT INTO workspace_members (workspace_id, user_id, role)
-VALUES ($1, $2, $3)
-RETURNING workspace_id, user_id, role, created_at
+INSERT INTO workspace_members (workspace_id, user_id, role, added_by_user_id)
+VALUES ($1, $2, $3, $4)
+RETURNING workspace_id, user_id, role, added_by_user_id, created_at
 `
 
 type CreateWorkspaceMemberParams struct {
-	WorkspaceID uuid.UUID
-	UserID      uuid.UUID
-	Role        WorkspaceRole
+	WorkspaceID   uuid.UUID
+	UserID        uuid.UUID
+	Role          WorkspaceRole
+	AddedByUserID pgtype.UUID
 }
 
-func (q *Queries) CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (WorkspaceMember, error) {
-	row := q.db.QueryRow(ctx, createWorkspaceMember, arg.WorkspaceID, arg.UserID, arg.Role)
-	var i WorkspaceMember
+type CreateWorkspaceMemberRow struct {
+	WorkspaceID   uuid.UUID
+	UserID        uuid.UUID
+	Role          WorkspaceRole
+	AddedByUserID pgtype.UUID
+	CreatedAt     time.Time
+}
+
+func (q *Queries) CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (CreateWorkspaceMemberRow, error) {
+	row := q.db.QueryRow(ctx, createWorkspaceMember,
+		arg.WorkspaceID,
+		arg.UserID,
+		arg.Role,
+		arg.AddedByUserID,
+	)
+	var i CreateWorkspaceMemberRow
 	err := row.Scan(
 		&i.WorkspaceID,
 		&i.UserID,
 		&i.Role,
+		&i.AddedByUserID,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -155,7 +171,7 @@ func (q *Queries) GetWorkspaceForMember(ctx context.Context, arg GetWorkspaceFor
 }
 
 const getWorkspaceMember = `-- name: GetWorkspaceMember :one
-SELECT workspace_id, user_id, role, created_at
+SELECT workspace_id, user_id, role, added_by_user_id, created_at
 FROM workspace_members
 WHERE workspace_id = $1 AND user_id = $2
 `
@@ -165,32 +181,44 @@ type GetWorkspaceMemberParams struct {
 	UserID      uuid.UUID
 }
 
-func (q *Queries) GetWorkspaceMember(ctx context.Context, arg GetWorkspaceMemberParams) (WorkspaceMember, error) {
+type GetWorkspaceMemberRow struct {
+	WorkspaceID   uuid.UUID
+	UserID        uuid.UUID
+	Role          WorkspaceRole
+	AddedByUserID pgtype.UUID
+	CreatedAt     time.Time
+}
+
+func (q *Queries) GetWorkspaceMember(ctx context.Context, arg GetWorkspaceMemberParams) (GetWorkspaceMemberRow, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	var i WorkspaceMember
+	var i GetWorkspaceMemberRow
 	err := row.Scan(
 		&i.WorkspaceID,
 		&i.UserID,
 		&i.Role,
+		&i.AddedByUserID,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
-SELECT u.id, u.email, u.name, wm.role, wm.created_at
+SELECT u.id, u.email, u.name, wm.role, wm.added_by_user_id, adder.name AS added_by_name, wm.created_at
 FROM workspace_members AS wm
 JOIN users AS u ON u.id = wm.user_id
+LEFT JOIN users AS adder ON adder.id = wm.added_by_user_id
 WHERE wm.workspace_id = $1
 ORDER BY wm.created_at, u.id
 `
 
 type ListWorkspaceMembersRow struct {
-	ID        uuid.UUID
-	Email     string
-	Name      string
-	Role      WorkspaceRole
-	CreatedAt time.Time
+	ID            uuid.UUID
+	Email         string
+	Name          string
+	Role          WorkspaceRole
+	AddedByUserID pgtype.UUID
+	AddedByName   pgtype.Text
+	CreatedAt     time.Time
 }
 
 func (q *Queries) ListWorkspaceMembers(ctx context.Context, workspaceID uuid.UUID) ([]ListWorkspaceMembersRow, error) {
@@ -207,6 +235,8 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, workspaceID uuid.UUI
 			&i.Email,
 			&i.Name,
 			&i.Role,
+			&i.AddedByUserID,
+			&i.AddedByName,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -267,7 +297,7 @@ const updateWorkspaceMemberRole = `-- name: UpdateWorkspaceMemberRole :one
 UPDATE workspace_members
 SET role = $3
 WHERE workspace_id = $1 AND user_id = $2
-RETURNING workspace_id, user_id, role, created_at
+RETURNING workspace_id, user_id, role, added_by_user_id, created_at
 `
 
 type UpdateWorkspaceMemberRoleParams struct {
@@ -276,13 +306,22 @@ type UpdateWorkspaceMemberRoleParams struct {
 	Role        WorkspaceRole
 }
 
-func (q *Queries) UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorkspaceMemberRoleParams) (WorkspaceMember, error) {
+type UpdateWorkspaceMemberRoleRow struct {
+	WorkspaceID   uuid.UUID
+	UserID        uuid.UUID
+	Role          WorkspaceRole
+	AddedByUserID pgtype.UUID
+	CreatedAt     time.Time
+}
+
+func (q *Queries) UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorkspaceMemberRoleParams) (UpdateWorkspaceMemberRoleRow, error) {
 	row := q.db.QueryRow(ctx, updateWorkspaceMemberRole, arg.WorkspaceID, arg.UserID, arg.Role)
-	var i WorkspaceMember
+	var i UpdateWorkspaceMemberRoleRow
 	err := row.Scan(
 		&i.WorkspaceID,
 		&i.UserID,
 		&i.Role,
+		&i.AddedByUserID,
 		&i.CreatedAt,
 	)
 	return i, err

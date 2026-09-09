@@ -58,12 +58,12 @@ Add nullable `workspace_members.added_by_user_id UUID REFERENCES users(id) ON DE
 ```sql
 CREATE UNIQUE INDEX workspace_invites_one_active_email_idx
 ON workspace_invites (workspace_id, email)
-WHERE accepted_at IS NULL AND revoked_at IS NULL AND expires_at > now();
+WHERE accepted_at IS NULL AND revoked_at IS NULL;
 ```
 
 - [ ] **Step 4: Generate SQLC and implement transaction behavior**
 
-Run `cd apps/api && go tool sqlc generate`. Implement a `pgx.Tx` acceptance method: lock invite by hash; check expiry, consumption, revocation, and email; insert the membership with `added_by_user_id`; set `accepted_at`; commit. Map unavailable states to sentinel errors and do not consume a mismatched-email invite.
+Run `cd apps/api && go tool sqlc generate`. Implement a `pgx.Tx` acceptance method: lock invite by hash; check expiry, consumption, revocation, and email; insert the membership with `added_by_user_id`; set `accepted_at`; commit. Before creating an invite, revoke previous rows for that email including expired unrevoked rows, then insert so the immutable partial unique index remains valid. Map unavailable states to sentinel errors and do not consume a mismatched-email invite.
 
 - [ ] **Step 5: Verify and commit**
 

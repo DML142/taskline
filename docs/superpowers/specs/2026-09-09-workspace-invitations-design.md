@@ -21,7 +21,7 @@ Migration `000006_workspace_invites` adds:
 
 1. Nullable `added_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL` to `workspace_members`, plus an index supporting administrator hierarchy checks. The creator's original owner membership and all pre-existing memberships remain `NULL`.
 2. `workspace_invites`, containing `id UUID`, `workspace_id`, normalized `email`, target `role`, `token_hash BYTEA UNIQUE`, `created_by_user_id`, `expires_at`, `accepted_at`, `revoked_at`, and timestamps. Foreign keys cascade with workspace deletion; actor references use `ON DELETE SET NULL` only where preserving historic invite audit data remains useful.
-3. A partial unique index ensuring one active invitation per normalized `(workspace_id, email)`. Creating a replacement invite first revokes the active one, then creates a new row in the same transaction.
+3. A partial unique index ensuring one unconsumed, unrevoked invitation per normalized `(workspace_id, email)`. Before creating a replacement, the service revokes both expired and active rows for that email in the same transaction; the index intentionally does not call `now()`, which PostgreSQL does not allow in an index predicate.
 
 When an invite is accepted, the service transaction locks the invite, rechecks expiry/revocation/acceptance, confirms the authenticated account email, creates `workspace_members` with `added_by_user_id = invite.created_by_user_id`, and sets `accepted_at`. A failed email comparison must not consume the invitation.
 

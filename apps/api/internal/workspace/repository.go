@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	database "taskline/apps/api/internal/platform/database/sqlc"
@@ -31,10 +32,11 @@ type Workspace struct {
 }
 
 type Membership struct {
-	WorkspaceID uuid.UUID `json:"workspaceId"`
-	UserID      uuid.UUID `json:"userId"`
-	Role        Role      `json:"role"`
-	CreatedAt   time.Time `json:"createdAt"`
+	WorkspaceID   uuid.UUID  `json:"workspaceId"`
+	UserID        uuid.UUID  `json:"userId"`
+	Role          Role       `json:"role"`
+	AddedByUserID *uuid.UUID `json:"addedByUserId"`
+	CreatedAt     time.Time  `json:"createdAt"`
 }
 
 type WorkspaceSummary struct {
@@ -43,11 +45,13 @@ type WorkspaceSummary struct {
 }
 
 type Member struct {
-	UserID    uuid.UUID `json:"userId"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	Role      Role      `json:"role"`
-	CreatedAt time.Time `json:"createdAt"`
+	UserID        uuid.UUID  `json:"userId"`
+	Email         string     `json:"email"`
+	Name          string     `json:"name"`
+	Role          Role       `json:"role"`
+	AddedByUserID *uuid.UUID `json:"addedByUserId"`
+	AddedByName   *string    `json:"addedByName"`
+	CreatedAt     time.Time  `json:"createdAt"`
 }
 
 type Repository struct{ pool *pgxpool.Pool }
@@ -66,9 +70,10 @@ func (r *Repository) CreateWithOwner(ctx context.Context, ownerID uuid.UUID, nam
 		return Workspace{}, fmt.Errorf("create workspace: %w", err)
 	}
 	if _, err := queries.CreateWorkspaceMember(ctx, database.CreateWorkspaceMemberParams{
-		WorkspaceID: workspace.ID,
-		UserID:      ownerID,
-		Role:        database.WorkspaceRole(RoleOwner),
+		WorkspaceID:   workspace.ID,
+		UserID:        ownerID,
+		Role:          database.WorkspaceRole(RoleOwner),
+		AddedByUserID: pgtype.UUID{},
 	}); err != nil {
 		return Workspace{}, fmt.Errorf("create workspace owner: %w", err)
 	}
@@ -83,7 +88,7 @@ func (r *Repository) GetMember(ctx context.Context, workspaceID, userID uuid.UUI
 	if err != nil {
 		return Membership{}, fmt.Errorf("get workspace member: %w", err)
 	}
-	return Membership{WorkspaceID: member.WorkspaceID, UserID: member.UserID, Role: Role(member.Role), CreatedAt: member.CreatedAt}, nil
+	return membershipFromRow(member.WorkspaceID, member.UserID, member.Role, member.AddedByUserID, member.CreatedAt), nil
 }
 
 func (r *Repository) ListForUser(ctx context.Context, userID uuid.UUID) ([]WorkspaceSummary, error) {
@@ -113,7 +118,16 @@ func (r *Repository) ListMembers(ctx context.Context, workspaceID uuid.UUID) ([]
 	}
 	result := make([]Member, len(rows))
 	for i, row := range rows {
-		result[i] = Member{UserID: row.ID, Email: row.Email, Name: row.Name, Role: Role(row.Role), CreatedAt: row.CreatedAt}
+		member := Member{UserID: row.ID, Email: row.Email, Name: row.Name, Role: Role(row.Role), CreatedAt: row.CreatedAt}
+		if row.AddedByUserID.Valid {
+			addedBy := uuid.UUID(row.AddedByUserID.Bytes)
+			member.AddedByUserID = &addedBy
+		}
+		if row.AddedByName.Valid {
+			name := row.AddedByName.String
+			member.AddedByName = &name
+		}
+		result[i] = member
 	}
 	return result, nil
 }
@@ -127,11 +141,11 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (uuid.UU
 }
 
 func (r *Repository) AddMember(ctx context.Context, workspaceID, userID uuid.UUID, role Role) (Membership, error) {
-	member, err := database.New(r.pool).CreateWorkspaceMember(ctx, database.CreateWorkspaceMemberParams{WorkspaceID: workspaceID, UserID: userID, Role: database.WorkspaceRole(role)})
+	member, err := database.New(r.pool).CreateWorkspaceMember(ctx, database.CreateWorkspaceMemberParams{WorkspaceID: workspaceID, UserID: userID, Role: database.WorkspaceRole(role), AddedByUserID: pgtype.UUID{}})
 	if err != nil {
 		return Membership{}, fmt.Errorf("add workspace member: %w", err)
 	}
-	return Membership{WorkspaceID: member.WorkspaceID, UserID: member.UserID, Role: Role(member.Role), CreatedAt: member.CreatedAt}, nil
+	return membershipFromRow(member.WorkspaceID, member.UserID, member.Role, member.AddedByUserID, member.CreatedAt), nil
 }
 
 func (r *Repository) UpdateName(ctx context.Context, workspaceID uuid.UUID, name string) (Workspace, error) {
@@ -164,7 +178,16 @@ func (r *Repository) UpdateMemberRole(ctx context.Context, workspaceID, userID u
 	if err != nil {
 		return Membership{}, fmt.Errorf("update workspace member role: %w", err)
 	}
-	return Membership{WorkspaceID: member.WorkspaceID, UserID: member.UserID, Role: Role(member.Role), CreatedAt: member.CreatedAt}, nil
+	return membershipFromRow(member.WorkspaceID, member.UserID, member.Role, member.AddedByUserID, member.CreatedAt), nil
+}
+
+func membershipFromRow(workspaceID, userID uuid.UUID, role database.WorkspaceRole, addedBy pgtype.UUID, createdAt time.Time) Membership {
+	membership := Membership{WorkspaceID: workspaceID, UserID: userID, Role: Role(role), CreatedAt: createdAt}
+	if addedBy.Valid {
+		value := uuid.UUID(addedBy.Bytes)
+		membership.AddedByUserID = &value
+	}
+	return membership
 }
 
 func (r *Repository) DeleteMember(ctx context.Context, workspaceID, userID uuid.UUID) (bool, error) {
