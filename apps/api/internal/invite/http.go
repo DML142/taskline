@@ -20,12 +20,14 @@ type Handler struct {
 func NewHandler(service *Service, authentication *auth.Service) http.Handler {
 	h := &Handler{service: service, auth: authentication}
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /workspaces/{workspaceID}", h.create)
-	mux.HandleFunc("GET /workspaces/{workspaceID}", h.list)
-	mux.HandleFunc("DELETE /workspaces/{workspaceID}/{inviteID}", h.revoke)
 	mux.HandleFunc("GET /{token}", h.preview)
-	mux.HandleFunc("POST /{token}/accept", h.accept)
-	return authentication.Authenticate(mux)
+	protected := http.NewServeMux()
+	protected.HandleFunc("POST /workspaces/{workspaceID}", h.create)
+	protected.HandleFunc("GET /workspaces/{workspaceID}", h.list)
+	protected.HandleFunc("DELETE /workspaces/{workspaceID}/{inviteID}", h.revoke)
+	protected.HandleFunc("POST /{token}/accept", h.accept)
+	mux.Handle("/", authentication.Authenticate(protected))
+	return mux
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
