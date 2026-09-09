@@ -25,7 +25,6 @@ func NewHandler(service *Service, authentication *auth.Service) http.Handler {
 	mux.HandleFunc("PATCH /{workspaceID}", h.rename)
 	mux.HandleFunc("DELETE /{workspaceID}", h.delete)
 	mux.HandleFunc("GET /{workspaceID}/members", h.listMembers)
-	mux.HandleFunc("POST /{workspaceID}/members", h.addMember)
 	mux.HandleFunc("PATCH /{workspaceID}/members/{userID}", h.changeMemberRole)
 	mux.HandleFunc("DELETE /{workspaceID}/members/{userID}", h.removeMember)
 	return authentication.Authenticate(mux)

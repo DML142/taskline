@@ -34,6 +34,7 @@ func TestRepositoryCreatesWorkspaceAndOwnerAtomically(t *testing.T) {
 	membership, err := repository.GetMember(ctx, created.ID, owner.ID)
 	require.NoError(t, err)
 	require.Equal(t, RoleOwner, membership.Role)
+	require.Nil(t, membership.AddedByUserID)
 }
 
 func testDatabaseURL(t *testing.T) string {

@@ -10,10 +10,11 @@ import {
   type WorkspaceMember,
   type WorkspaceSummary,
 } from "@/lib/workspace-api";
+import { InviteApi, type WorkspaceInvite } from "@/lib/invite-api";
 
 export default function WorkspaceProjectsPage() {
   const { workspaceSlug } = useParams<{ workspaceSlug: string }>();
-  const { protectedRequest } = useAuth();
+  const { protectedRequest, user } = useAuth();
   const baseURL = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
   const workspaceApi = useMemo(
     () => new WorkspaceApi(baseURL, protectedRequest),
@@ -23,9 +24,14 @@ export default function WorkspaceProjectsPage() {
     () => new ProjectApi(baseURL, protectedRequest),
     [baseURL, protectedRequest],
   );
+  const inviteApi = useMemo(
+    () => new InviteApi(baseURL, protectedRequest),
+    [baseURL, protectedRequest],
+  );
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
+  const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [email, setEmail] = useState("");
@@ -44,14 +50,16 @@ export default function WorkspaceProjectsPage() {
         return Promise.all([
           projectApi.list(selected.id),
           workspaceApi.members(selected.id),
-        ]) as Promise<[Project[], WorkspaceMember[]]>;
+          inviteApi.list(selected.id),
+        ]) as Promise<[Project[], WorkspaceMember[], WorkspaceInvite[]]>;
       })
-      .then(([nextProjects, nextMembers]) => {
+      .then(([nextProjects, nextMembers, nextInvites]) => {
         setProjects(nextProjects);
         setMembers(nextMembers);
+        setInvites(nextInvites);
       })
       .catch((caught) => setError(message(caught)));
-  }, [projectApi, workspaceApi, workspaceSlug]);
+  }, [inviteApi, projectApi, workspaceApi, workspaceSlug]);
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -84,13 +92,25 @@ export default function WorkspaceProjectsPage() {
     setMemberPending(true);
     setError(null);
     try {
-      await workspaceApi.addMember(workspace.id, email, role);
+      await inviteApi.create(workspace.id, { email, role });
       setEmail("");
-      await reloadMembers();
+      setInvites(await inviteApi.list(workspace.id));
     } catch (caught) {
       setError(message(caught));
     } finally {
       setMemberPending(false);
+    }
+  }
+
+  async function revokeInvite(inviteId: string) {
+    if (!workspace) return;
+    try {
+      await inviteApi.revoke(workspace.id, inviteId);
+      setInvites((current) =>
+        current.filter((invite) => invite.id !== inviteId),
+      );
+    } catch (caught) {
+      setError(message(caught));
     }
   }
 
@@ -190,7 +210,7 @@ export default function WorkspaceProjectsPage() {
       </ul>
       <section className="mt-10">
         <h2 className="text-lg font-semibold">Members</h2>
-        {owner && (
+        {canManage && (
           <form
             onSubmit={addMember}
             className="mt-4 flex flex-wrap gap-2 rounded-lg border p-4"
@@ -224,7 +244,7 @@ export default function WorkspaceProjectsPage() {
               disabled={memberPending}
               className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >
-              {memberPending ? "Adding…" : "Add member"}
+              {memberPending ? "Sending…" : "Send invitation"}
             </button>
           </form>
         )}
@@ -239,23 +259,62 @@ export default function WorkspaceProjectsPage() {
                 <span className="block text-sm text-muted-foreground">
                   {member.email}
                 </span>
+                {canManage && member.addedByName && (
+                  <span className="block text-xs text-muted-foreground">
+                    Added by {member.addedByName}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground">
                   {member.role}
                 </span>
-                {owner && member.role !== "OWNER" && (
-                  <button
-                    onClick={() => void removeMember(member.userId)}
-                    className="text-xs text-destructive underline"
-                  >
-                    Remove
-                  </button>
-                )}
+                {(owner ||
+                  (workspace.role === "ADMIN" &&
+                    (member.role !== "ADMIN" ||
+                      member.addedByUserId === user?.id))) &&
+                  member.role !== "OWNER" && (
+                    <button
+                      onClick={() => void removeMember(member.userId)}
+                      className="text-xs text-destructive underline"
+                    >
+                      Remove
+                    </button>
+                  )}
               </span>
             </li>
           ))}
         </ul>
+        {canManage && (
+          <section className="mt-6">
+            <h3 className="text-sm font-semibold">Active invitations</h3>
+            <ul className="mt-2 divide-y rounded-lg border">
+              {invites.length === 0 ? (
+                <li className="p-4 text-sm text-muted-foreground">
+                  No active invitations.
+                </li>
+              ) : (
+                invites.map((invite) => (
+                  <li
+                    key={invite.id}
+                    className="flex items-center justify-between gap-3 p-4 text-sm"
+                  >
+                    <span>
+                      {invite.email} · {invite.role} · expires{" "}
+                      {new Date(invite.expiresAt).toLocaleString()}
+                    </span>
+                    <button
+                      onClick={() => void revokeInvite(invite.id)}
+                      className="text-xs text-destructive underline"
+                    >
+                      Revoke
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </section>
+        )}
       </section>
     </main>
   );

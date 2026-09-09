@@ -9,6 +9,7 @@ import {
   type WorkspaceMember,
   type WorkspaceSummary,
 } from "@/lib/workspace-api";
+import { InviteApi } from "@/lib/invite-api";
 
 export default function WorkspacePage() {
   const params = useParams<{ workspaceId: string }>();
@@ -16,6 +17,14 @@ export default function WorkspacePage() {
   const api = useMemo(
     () =>
       new WorkspaceApi(
+        process.env.NEXT_PUBLIC_API_URL ?? "/api/v1",
+        protectedRequest,
+      ),
+    [protectedRequest],
+  );
+  const inviteApi = useMemo(
+    () =>
+      new InviteApi(
         process.env.NEXT_PUBLIC_API_URL ?? "/api/v1",
         protectedRequest,
       ),
@@ -52,12 +61,12 @@ export default function WorkspacePage() {
     setPending(true);
     setError(null);
     try {
-      await api.addMember(params.workspaceId, email, role);
+      await inviteApi.create(params.workspaceId, { email, role });
       setEmail("");
       await reloadMembers();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Unable to add member.",
+        caught instanceof Error ? caught.message : "Unable to send invitation.",
       );
     } finally {
       setPending(false);

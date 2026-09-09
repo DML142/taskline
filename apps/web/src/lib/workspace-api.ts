@@ -15,6 +15,8 @@ export type WorkspaceMember = {
   email: string;
   name: string;
   role: WorkspaceRole;
+  addedByUserId: string | null;
+  addedByName: string | null;
   createdAt: string;
 };
 
@@ -71,19 +73,6 @@ export class WorkspaceApi {
     if (!response.ok)
       throw await responseError(response, "Unable to load members");
     return ((await response.json()) as { members: WorkspaceMember[] }).members;
-  }
-
-  async addMember(
-    workspaceId: string,
-    email: string,
-    role: Exclude<WorkspaceRole, "OWNER">,
-  ): Promise<void> {
-    const response = await this.request(
-      `${this.baseURL}/workspaces/${workspaceId}/members`,
-      json("POST", { email, role }),
-    );
-    if (!response.ok)
-      throw await responseError(response, "Unable to add member");
   }
 
   async updateMemberRole(

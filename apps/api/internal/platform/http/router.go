@@ -86,6 +86,11 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 		issueRoutes := http.StripPrefix("/api/v1/issues", workspaces[2])
 		r.Mount("/api/v1/issues/", issueRoutes)
 	}
+	if len(workspaces) > 3 && workspaces[3] != nil {
+		inviteRoutes := http.StripPrefix("/api/v1/workspace-invites", workspaces[3])
+		r.Mount("/api/v1/workspace-invites/", inviteRoutes)
+		r.Mount("/api/v1/invitations/", http.StripPrefix("/api/v1/invitations", workspaces[3]))
+	}
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(logger, w, http.StatusNotFound, "not_found", "Resource not found")
 	})

@@ -144,7 +144,11 @@ func (s *Service) ChangeMemberRole(ctx context.Context, actorID, workspaceID, us
 }
 
 func (s *Service) RemoveMember(ctx context.Context, actorID, workspaceID, userID uuid.UUID) error {
-	if err := s.requireOwner(ctx, actorID, workspaceID); err != nil {
+	actor, err := s.repository.GetMember(ctx, workspaceID, actorID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrWorkspaceNotFound
+	}
+	if err != nil {
 		return err
 	}
 	target, err := s.repository.GetMember(ctx, workspaceID, userID)
@@ -154,8 +158,16 @@ func (s *Service) RemoveMember(ctx context.Context, actorID, workspaceID, userID
 	if err != nil {
 		return err
 	}
-	if target.Role == RoleOwner {
+	if actorID == userID || target.Role == RoleOwner {
 		return ErrInvalidRequest
+	}
+	if actor.Role != RoleOwner {
+		if actor.Role != RoleAdmin {
+			return ErrForbidden
+		}
+		if target.Role == RoleAdmin && (target.AddedByUserID == nil || *target.AddedByUserID != actorID) {
+			return ErrForbidden
+		}
 	}
 	deleted, err := s.repository.DeleteMember(ctx, workspaceID, userID)
 	if err != nil {

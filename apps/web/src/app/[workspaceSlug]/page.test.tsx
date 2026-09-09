@@ -37,6 +37,9 @@ const protectedRequest = vi.fn(async (input: RequestInfo | URL) => {
       }),
     );
   }
+  if (url.endsWith("/invitations/manage/workspaces/workspace-1")) {
+    return new Response(JSON.stringify({ invites: [] }));
+  }
   return new Response(null, { status: 404 });
 });
 
@@ -55,7 +58,7 @@ describe("WorkspaceProjectsPage", () => {
     render(<WorkspaceProjectsPage />);
 
     expect(
-      await screen.findByRole("button", { name: "Add member" }),
+      await screen.findByRole("button", { name: "Send invitation" }),
     ).toBeTruthy();
     expect(screen.getByText("owner@example.com")).toBeTruthy();
   });

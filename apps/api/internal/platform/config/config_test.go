@@ -79,6 +79,7 @@ func TestLoadAcceptsAuthenticationConfiguration(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
 	setValidAuthEnv(t)
+	setValidSMTPEnv(t)
 	t.Setenv("WEB_ORIGIN", "https://app.taskline.example")
 	t.Setenv("COOKIE_SECURE", "true")
 
@@ -89,6 +90,37 @@ func TestLoadAcceptsAuthenticationConfiguration(t *testing.T) {
 	require.True(t, cfg.Auth.CookieSecure)
 	require.Equal(t, "taskline-api", cfg.Auth.JWTIssuer)
 	require.Equal(t, "taskline-web", cfg.Auth.JWTAudience)
+	require.Equal(t, "smtp.taskline.example", cfg.SMTP.Host)
+	require.Equal(t, "starttls", cfg.SMTP.TLSMode)
+}
+
+func TestLoadAcceptsLocalSMTPWithoutTLS(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
+	setValidAuthEnv(t)
+	t.Setenv("SMTP_TLS_MODE", "none")
+	t.Setenv("SMTP_USERNAME", "")
+	t.Setenv("SMTP_PASSWORD", "")
+
+	cfg, err := Load()
+
+	require.NoError(t, err)
+	require.Equal(t, "none", cfg.SMTP.TLSMode)
+}
+
+func TestLoadRequiresSMTPConfiguration(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
+	setValidAuthEnv(t)
+	t.Setenv("SMTP_HOST", "")
+	t.Setenv("SMTP_PORT", "")
+	t.Setenv("SMTP_USERNAME", "")
+	t.Setenv("SMTP_PASSWORD", "")
+	t.Setenv("SMTP_FROM", "")
+
+	_, err := Load()
+
+	require.EqualError(t, err, "SMTP_HOST is required")
 }
 
 func setValidAuthEnv(t *testing.T) {
@@ -98,4 +130,14 @@ func setValidAuthEnv(t *testing.T) {
 	t.Setenv("JWT_AUDIENCE", "taskline-web")
 	t.Setenv("WEB_ORIGIN", "http://localhost:3000")
 	t.Setenv("COOKIE_SECURE", "false")
+	setValidSMTPEnv(t)
+}
+
+func setValidSMTPEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("SMTP_HOST", "smtp.taskline.example")
+	t.Setenv("SMTP_PORT", "587")
+	t.Setenv("SMTP_USERNAME", "taskline")
+	t.Setenv("SMTP_PASSWORD", "smtp-test-password")
+	t.Setenv("SMTP_FROM", "Taskline <no-reply@taskline.example>")
 }

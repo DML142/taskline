@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"taskline/apps/api/internal/auth"
+	"taskline/apps/api/internal/invite"
 	"taskline/apps/api/internal/issue"
 	"taskline/apps/api/internal/platform/config"
 	"taskline/apps/api/internal/platform/database"
@@ -43,11 +44,13 @@ func run(logger *slog.Logger) error {
 	authService := auth.NewService(auth.NewRepository(pool), auth.NewTokenManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.JWTAudience, time.Now), time.Now)
 	authentication := auth.NewHandler(logger, authService, cfg.Auth)
 	workspaces := workspace.NewHandler(workspace.NewService(workspace.NewRepository(pool)), authService)
+	workspaceService := workspace.NewService(workspace.NewRepository(pool))
+	invites := invite.NewHandler(invite.NewService(invite.NewRepository(pool), workspaceService, invite.NewSMTPMailer(cfg.SMTP), cfg.Auth.WebOrigin, time.Now), authService)
 	projects := project.NewHandler(project.NewService(project.NewRepository(pool)), authService)
 	issues := issue.NewHandler(issue.NewService(issue.NewRepository(pool)), authService)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces, projects, issues),
+		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces, projects, issues, invites),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

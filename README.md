@@ -19,7 +19,7 @@ From the repository root:
 
 ```sh
 cp .env.example .env
-docker compose up -d --wait postgres
+docker compose --profile mailpit up -d --wait postgres mailpit
 pnpm install --frozen-lockfile
 ```
 
@@ -27,8 +27,7 @@ Start the API in a separate terminal:
 
 ```sh
 cd apps/api
-export DATABASE_URL='postgres://taskline:taskline-local@127.0.0.1:5432/taskline?sslmode=disable'
-export JWT_SECRET='replace-this-with-a-random-secret-of-at-least-32-bytes'
+set -a; . .env.local.example; set +a
 go run ./cmd/migrate up
 go run ./cmd/api
 ```
@@ -56,12 +55,15 @@ Root `.env` configures Compose only: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POST
 
 The API reads `DATABASE_URL`, `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`, `WEB_ORIGIN`, `COOKIE_SECURE` and `HTTP_ADDR` from the process environment; it does not load dotenv files. `DATABASE_URL` and a `JWT_SECRET` of at least 32 bytes are required. `HTTP_ADDR` defaults to `127.0.0.1:8080`, `JWT_ISSUER` to `taskline-api`, `JWT_AUDIENCE` to `taskline-web`, `WEB_ORIGIN` to `http://localhost:3000`, and `COOKIE_SECURE` to `false`. See `apps/api/.env.example`.
 
-```sh
-cd apps/api
-export DATABASE_URL='postgres://taskline:taskline-local@127.0.0.1:5432/taskline?sslmode=disable'
-export JWT_SECRET='replace-this-with-a-random-secret-of-at-least-32-bytes'
-HTTP_ADDR=127.0.0.1:9090 go run ./cmd/api
-```
+Workspace invitations require `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, and `SMTP_TLS_MODE`. `SMTP_TLS_MODE` defaults to `starttls`, which also requires `SMTP_USERNAME` and `SMTP_PASSWORD`; use `none` only for a trusted local development SMTP sink, where credentials may be omitted. `WEB_ORIGIN` must be the public application origin because invitation emails contain a one-time acceptance URL.
+
+### Local email preview
+
+Run `docker compose --profile mailpit up -d --wait postgres mailpit`, then source `apps/api/.env.local.example` from `apps/api` before starting the API. Mailpit accepts local SMTP at `127.0.0.1:1025` and shows received messages at http://127.0.0.1:8025. No email leaves the machine.
+
+### Production SMTP with Resend
+
+Copy `apps/api/.env.production.example` into your deployment's secret manager. Resend SMTP uses `smtp.resend.com`, port `587`, username `resend`, an API key as the password, and STARTTLS. Verify the sender domain and set `SMTP_FROM` to an address on it before sending invitations. Keep the API key out of git. [Resend SMTP documentation](https://resend.com/docs/send-with-smtp) lists the current credentials and prerequisites.
 
 Set `NEXT_PUBLIC_API_URL` only when the API is not at `http://localhost:8080/api/v1`.
 
@@ -85,6 +87,8 @@ Workspace routes are protected by bearer access tokens under `/api/v1/workspaces
 cd apps/api
 go run ./cmd/migrate up
 ```
+
+Owners and administrators invite people by email. Each opaque invitation URL expires after 24 hours, can be accepted only once, and requires the recipient to sign in or register using the exact invited email address. Owners can remove any other member; administrators can remove members/viewers and only administrators whom they added.
 
 ## Projects
 
