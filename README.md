@@ -56,6 +56,8 @@ Root `.env` configures Compose only: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POST
 
 The API reads `DATABASE_URL`, `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`, `WEB_ORIGIN`, `COOKIE_SECURE` and `HTTP_ADDR` from the process environment; it does not load dotenv files. `DATABASE_URL` and a `JWT_SECRET` of at least 32 bytes are required. `HTTP_ADDR` defaults to `127.0.0.1:8080`, `JWT_ISSUER` to `taskline-api`, `JWT_AUDIENCE` to `taskline-web`, `WEB_ORIGIN` to `http://localhost:3000`, and `COOKIE_SECURE` to `false`. See `apps/api/.env.example`.
 
+Workspace invitations require `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM`. The configured server must support STARTTLS; use port 587 unless your provider documents another STARTTLS port. `WEB_ORIGIN` must be the public application origin because invitation emails contain a one-time acceptance URL.
+
 ```sh
 cd apps/api
 export DATABASE_URL='postgres://taskline:taskline-local@127.0.0.1:5432/taskline?sslmode=disable'
@@ -85,6 +87,8 @@ Workspace routes are protected by bearer access tokens under `/api/v1/workspaces
 cd apps/api
 go run ./cmd/migrate up
 ```
+
+Owners and administrators invite people by email. Each opaque invitation URL expires after 24 hours, can be accepted only once, and requires the recipient to sign in or register using the exact invited email address. Owners can remove any other member; administrators can remove members/viewers and only administrators whom they added.
 
 ## Projects
 

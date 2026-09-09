@@ -55,7 +55,7 @@ describe("WorkspaceProjectsPage", () => {
     render(<WorkspaceProjectsPage />);
 
     expect(
-      await screen.findByRole("button", { name: "Add member" }),
+      await screen.findByRole("button", { name: "Send invitation" }),
     ).toBeTruthy();
     expect(screen.getByText("owner@example.com")).toBeTruthy();
   });

@@ -9,6 +9,12 @@ FROM workspace_invites
 WHERE token_hash = $1
 FOR UPDATE;
 
+-- name: GetWorkspaceInviteByTokenHash :one
+SELECT wi.id, wi.workspace_id, w.name AS workspace_name, wi.email, wi.role, wi.created_by_user_id, wi.expires_at, wi.accepted_at, wi.revoked_at
+FROM workspace_invites AS wi
+JOIN workspaces AS w ON w.id = wi.workspace_id
+WHERE wi.token_hash = $1;
+
 -- name: RevokeOpenWorkspaceInvitesForEmail :exec
 UPDATE workspace_invites
 SET revoked_at = now()

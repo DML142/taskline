@@ -189,7 +189,9 @@ Commit: `git add apps/api/internal/invite apps/api/internal/workspace apps/api/i
 Test protected API construction for all invite methods. Test owner/admin invite form visibility and member/viewer absence; show “Added by” only to managers; show admin removal only if the target provenance equals the current admin. Test preview, success, expired/unavailable, and mismatch acceptance pages plus login/register continuation links.
 
 ```tsx
-expect(await screen.findByRole("button", { name: "Send invitation" })).toBeTruthy();
+expect(
+  await screen.findByRole("button", { name: "Send invitation" }),
+).toBeTruthy();
 expect(screen.getByText("Added by Admin One")).toBeTruthy();
 expect(screen.queryByRole("button", { name: "Remove Peer Admin" })).toBeNull();
 ```

@@ -80,6 +80,13 @@ func (s *Service) AcceptForUser(ctx context.Context, rawToken string, userID uui
 	return s.Accept(ctx, rawToken, userID, email)
 }
 
+func (s *Service) Preview(ctx context.Context, rawToken string) (Preview, error) {
+	if rawToken == "" {
+		return Preview{}, ErrUnavailable
+	}
+	return s.repository.Preview(ctx, hashToken(rawToken))
+}
+
 func unavailable(err error) bool {
 	return errors.Is(err, ErrUnavailable) || errors.Is(err, pgx.ErrNoRows)
 }

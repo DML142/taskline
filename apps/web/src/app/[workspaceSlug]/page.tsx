@@ -10,6 +10,7 @@ import {
   type WorkspaceMember,
   type WorkspaceSummary,
 } from "@/lib/workspace-api";
+import { InviteApi } from "@/lib/invite-api";
 
 export default function WorkspaceProjectsPage() {
   const { workspaceSlug } = useParams<{ workspaceSlug: string }>();
@@ -21,6 +22,10 @@ export default function WorkspaceProjectsPage() {
   );
   const projectApi = useMemo(
     () => new ProjectApi(baseURL, protectedRequest),
+    [baseURL, protectedRequest],
+  );
+  const inviteApi = useMemo(
+    () => new InviteApi(baseURL, protectedRequest),
     [baseURL, protectedRequest],
   );
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
@@ -84,7 +89,7 @@ export default function WorkspaceProjectsPage() {
     setMemberPending(true);
     setError(null);
     try {
-      await workspaceApi.addMember(workspace.id, email, role);
+      await inviteApi.create(workspace.id, { email, role });
       setEmail("");
       await reloadMembers();
     } catch (caught) {
@@ -190,7 +195,7 @@ export default function WorkspaceProjectsPage() {
       </ul>
       <section className="mt-10">
         <h2 className="text-lg font-semibold">Members</h2>
-        {owner && (
+        {canManage && (
           <form
             onSubmit={addMember}
             className="mt-4 flex flex-wrap gap-2 rounded-lg border p-4"
@@ -224,7 +229,7 @@ export default function WorkspaceProjectsPage() {
               disabled={memberPending}
               className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >
-              {memberPending ? "Adding…" : "Add member"}
+              {memberPending ? "Sending…" : "Send invitation"}
             </button>
           </form>
         )}

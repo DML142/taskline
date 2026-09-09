@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const acceptWorkspaceInvite = `-- name: AcceptWorkspaceInvite :execrows
@@ -62,6 +63,42 @@ func (q *Queries) CreateWorkspaceInvite(ctx context.Context, arg CreateWorkspace
 		&i.AcceptedAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getWorkspaceInviteByTokenHash = `-- name: GetWorkspaceInviteByTokenHash :one
+SELECT wi.id, wi.workspace_id, w.name AS workspace_name, wi.email, wi.role, wi.created_by_user_id, wi.expires_at, wi.accepted_at, wi.revoked_at
+FROM workspace_invites AS wi
+JOIN workspaces AS w ON w.id = wi.workspace_id
+WHERE wi.token_hash = $1
+`
+
+type GetWorkspaceInviteByTokenHashRow struct {
+	ID              uuid.UUID
+	WorkspaceID     uuid.UUID
+	WorkspaceName   string
+	Email           string
+	Role            WorkspaceRole
+	CreatedByUserID uuid.UUID
+	ExpiresAt       time.Time
+	AcceptedAt      pgtype.Timestamptz
+	RevokedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetWorkspaceInviteByTokenHash(ctx context.Context, tokenHash []byte) (GetWorkspaceInviteByTokenHashRow, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceInviteByTokenHash, tokenHash)
+	var i GetWorkspaceInviteByTokenHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.WorkspaceName,
+		&i.Email,
+		&i.Role,
+		&i.CreatedByUserID,
+		&i.ExpiresAt,
+		&i.AcceptedAt,
+		&i.RevokedAt,
 	)
 	return i, err
 }

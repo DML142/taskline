@@ -30,6 +30,13 @@ type Invite struct {
 	CreatedAt       time.Time      `json:"createdAt"`
 }
 
+type Preview struct {
+	WorkspaceID   uuid.UUID      `json:"workspaceId"`
+	WorkspaceName string         `json:"workspaceName"`
+	Role          workspace.Role `json:"role"`
+	ExpiresAt     time.Time      `json:"expiresAt"`
+}
+
 type Repository struct{ pool *pgxpool.Pool }
 
 func NewRepository(pool *pgxpool.Pool) *Repository { return &Repository{pool: pool} }
@@ -99,4 +106,18 @@ func (r *Repository) EmailForUser(ctx context.Context, userID uuid.UUID) (string
 		return "", ErrUnavailable
 	}
 	return user.Email, err
+}
+
+func (r *Repository) Preview(ctx context.Context, tokenHash [sha256.Size]byte) (Preview, error) {
+	row, err := database.New(r.pool).GetWorkspaceInviteByTokenHash(ctx, tokenHash[:])
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Preview{}, ErrUnavailable
+	}
+	if err != nil {
+		return Preview{}, err
+	}
+	if row.AcceptedAt.Valid || row.RevokedAt.Valid || !row.ExpiresAt.After(time.Now()) {
+		return Preview{}, ErrUnavailable
+	}
+	return Preview{WorkspaceID: row.WorkspaceID, WorkspaceName: row.WorkspaceName, Role: workspace.Role(row.Role), ExpiresAt: row.ExpiresAt}, nil
 }
