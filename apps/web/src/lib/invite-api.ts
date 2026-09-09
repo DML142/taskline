@@ -48,6 +48,20 @@ export class InviteApi {
       );
     return ((await response.json()) as { invite: InvitePreview }).invite;
   }
+  async list(workspaceId: string): Promise<WorkspaceInvite[]> {
+    const response = await this.request(
+      `${this.baseURL}/invitations/workspaces/${workspaceId}`,
+    );
+    if (!response.ok) throw new Error("Unable to load invitations");
+    return ((await response.json()) as { invites: WorkspaceInvite[] }).invites;
+  }
+  async revoke(workspaceId: string, inviteId: string): Promise<void> {
+    const response = await this.request(
+      `${this.baseURL}/invitations/workspaces/${workspaceId}/${inviteId}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) throw new Error("Unable to revoke invitation");
+  }
   async accept(token: string): Promise<void> {
     const response = await this.request(
       `${this.baseURL}/workspace-invites/${encodeURIComponent(token)}/accept`,

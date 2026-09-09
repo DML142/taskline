@@ -37,6 +37,9 @@ const protectedRequest = vi.fn(async (input: RequestInfo | URL) => {
       }),
     );
   }
+  if (url.endsWith("/invitations/workspaces/workspace-1")) {
+    return new Response(JSON.stringify({ invites: [] }));
+  }
   return new Response(null, { status: 404 });
 });
 

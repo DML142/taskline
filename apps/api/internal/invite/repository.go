@@ -125,3 +125,38 @@ func (r *Repository) Preview(ctx context.Context, tokenHash [sha256.Size]byte) (
 	}
 	return Preview{WorkspaceID: row.WorkspaceID, WorkspaceName: row.WorkspaceName, Role: workspace.Role(row.Role), ExpiresAt: row.ExpiresAt}, nil
 }
+
+func (r *Repository) List(ctx context.Context, workspaceID uuid.UUID, creatorID *uuid.UUID) ([]Invite, error) {
+	q := database.New(r.pool)
+	var result []Invite
+	if creatorID == nil {
+		rows, err := q.ListOpenWorkspaceInvites(ctx, workspaceID)
+		if err != nil {
+			return nil, err
+		}
+		result = make([]Invite, len(rows))
+		for i, row := range rows {
+			result[i] = Invite{ID: row.ID, WorkspaceID: row.WorkspaceID, Email: row.Email, Role: workspace.Role(row.Role), CreatedByUserID: row.CreatedByUserID, CreatedByName: row.CreatedByName, ExpiresAt: row.ExpiresAt, CreatedAt: row.CreatedAt}
+		}
+		return result, nil
+	}
+	rows, err := q.ListOpenWorkspaceInvitesByCreator(ctx, database.ListOpenWorkspaceInvitesByCreatorParams{WorkspaceID: workspaceID, CreatedByUserID: *creatorID})
+	if err != nil {
+		return nil, err
+	}
+	result = make([]Invite, len(rows))
+	for i, row := range rows {
+		result[i] = Invite{ID: row.ID, WorkspaceID: row.WorkspaceID, Email: row.Email, Role: workspace.Role(row.Role), CreatedByUserID: row.CreatedByUserID, CreatedByName: row.CreatedByName, ExpiresAt: row.ExpiresAt, CreatedAt: row.CreatedAt}
+	}
+	return result, nil
+}
+
+func (r *Repository) Revoke(ctx context.Context, workspaceID, inviteID uuid.UUID, creatorID *uuid.UUID) (bool, error) {
+	q := database.New(r.pool)
+	if creatorID == nil {
+		count, err := q.RevokeWorkspaceInvite(ctx, database.RevokeWorkspaceInviteParams{ID: inviteID, WorkspaceID: workspaceID})
+		return count > 0, err
+	}
+	count, err := q.RevokeWorkspaceInviteByCreator(ctx, database.RevokeWorkspaceInviteByCreatorParams{ID: inviteID, WorkspaceID: workspaceID, CreatedByUserID: *creatorID})
+	return count > 0, err
+}

@@ -21,9 +21,45 @@ func NewHandler(service *Service, authentication *auth.Service) http.Handler {
 	h := &Handler{service: service, auth: authentication}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /workspaces/{workspaceID}", h.create)
+	mux.HandleFunc("GET /workspaces/{workspaceID}", h.list)
+	mux.HandleFunc("DELETE /workspaces/{workspaceID}/{inviteID}", h.revoke)
 	mux.HandleFunc("GET /{token}", h.preview)
 	mux.HandleFunc("POST /{token}/accept", h.accept)
 	return authentication.Authenticate(mux)
+}
+
+func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
+	workspaceID, err := uuid.Parse(r.PathValue("workspaceID"))
+	if err != nil {
+		writeError(w, ErrInvalidRequest)
+		return
+	}
+	identity, _ := auth.IdentityFromContext(r.Context())
+	invites, err := h.service.List(r.Context(), identity.UserID, workspaceID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"invites": invites})
+}
+
+func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
+	workspaceID, err := uuid.Parse(r.PathValue("workspaceID"))
+	if err != nil {
+		writeError(w, ErrInvalidRequest)
+		return
+	}
+	inviteID, err := uuid.Parse(r.PathValue("inviteID"))
+	if err != nil {
+		writeError(w, ErrInvalidRequest)
+		return
+	}
+	identity, _ := auth.IdentityFromContext(r.Context())
+	if err := h.service.Revoke(r.Context(), identity.UserID, workspaceID, inviteID); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type createRequest struct {

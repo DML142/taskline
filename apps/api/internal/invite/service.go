@@ -60,6 +60,7 @@ func (s *Service) Create(ctx context.Context, actorID, workspaceID uuid.UUID, em
 		return Invite{}, err
 	}
 	if err := s.mailer.Send(ctx, Message{To: invite.Email, WorkspaceName: current.Name, AcceptanceURL: s.webOrigin + "/invites/" + secret}); err != nil {
+		_, _ = s.repository.Revoke(ctx, workspaceID, invite.ID, nil)
 		return Invite{}, fmt.Errorf("%w: %v", ErrDeliveryFailed, err)
 	}
 	return invite, nil
@@ -85,6 +86,41 @@ func (s *Service) Preview(ctx context.Context, rawToken string) (Preview, error)
 		return Preview{}, ErrUnavailable
 	}
 	return s.repository.Preview(ctx, hashToken(rawToken))
+}
+
+func (s *Service) List(ctx context.Context, actorID, workspaceID uuid.UUID) ([]Invite, error) {
+	current, err := s.workspaces.Get(ctx, actorID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if current.Role == workspace.RoleOwner {
+		return s.repository.List(ctx, workspaceID, nil)
+	}
+	if current.Role == workspace.RoleAdmin {
+		return s.repository.List(ctx, workspaceID, &actorID)
+	}
+	return nil, ErrForbidden
+}
+
+func (s *Service) Revoke(ctx context.Context, actorID, workspaceID, inviteID uuid.UUID) error {
+	current, err := s.workspaces.Get(ctx, actorID, workspaceID)
+	if err != nil {
+		return err
+	}
+	var creatorID *uuid.UUID
+	if current.Role == workspace.RoleAdmin {
+		creatorID = &actorID
+	} else if current.Role != workspace.RoleOwner {
+		return ErrForbidden
+	}
+	revoked, err := s.repository.Revoke(ctx, workspaceID, inviteID, creatorID)
+	if err != nil {
+		return err
+	}
+	if !revoked {
+		return ErrUnavailable
+	}
+	return nil
 }
 
 func unavailable(err error) bool {
