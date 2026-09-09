@@ -26,7 +26,7 @@ export class InviteApi {
     input: { email: string; role: InviteRole },
   ): Promise<WorkspaceInvite> {
     const response = await this.request(
-      `${this.baseURL}/invitations/workspaces/${workspaceId}`,
+      `${this.baseURL}/invitations/manage/workspaces/${workspaceId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -50,14 +50,14 @@ export class InviteApi {
   }
   async list(workspaceId: string): Promise<WorkspaceInvite[]> {
     const response = await this.request(
-      `${this.baseURL}/invitations/workspaces/${workspaceId}`,
+      `${this.baseURL}/invitations/manage/workspaces/${workspaceId}`,
     );
     if (!response.ok) throw new Error("Unable to load invitations");
     return ((await response.json()) as { invites: WorkspaceInvite[] }).invites;
   }
   async revoke(workspaceId: string, inviteId: string): Promise<void> {
     const response = await this.request(
-      `${this.baseURL}/invitations/workspaces/${workspaceId}/${inviteId}`,
+      `${this.baseURL}/invitations/manage/workspaces/${workspaceId}/${inviteId}`,
       { method: "DELETE" },
     );
     if (!response.ok) throw new Error("Unable to revoke invitation");

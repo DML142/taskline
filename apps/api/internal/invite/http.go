@@ -22,9 +22,9 @@ func NewHandler(service *Service, authentication *auth.Service) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{token}", h.preview)
 	protected := http.NewServeMux()
-	protected.HandleFunc("POST /workspaces/{workspaceID}", h.create)
-	protected.HandleFunc("GET /workspaces/{workspaceID}", h.list)
-	protected.HandleFunc("DELETE /workspaces/{workspaceID}/{inviteID}", h.revoke)
+	protected.HandleFunc("POST /manage/workspaces/{workspaceID}", h.create)
+	protected.HandleFunc("GET /manage/workspaces/{workspaceID}", h.list)
+	protected.HandleFunc("DELETE /manage/workspaces/{workspaceID}/{inviteID}", h.revoke)
 	protected.HandleFunc("POST /{token}/accept", h.accept)
 	mux.Handle("/", authentication.Authenticate(protected))
 	return mux
