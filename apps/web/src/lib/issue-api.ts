@@ -27,6 +27,7 @@ export type IssueInput = {
 export type IssueFilter = {
   status?: IssueStatus;
   assigneeId?: string;
+  priority?: IssuePriority;
 };
 
 export class IssueApi {
@@ -43,6 +44,7 @@ export class IssueApi {
     const params = new URLSearchParams();
     if (filter.status) params.set("status", filter.status);
     if (filter.assigneeId) params.set("assigneeId", filter.assigneeId);
+    if (filter.priority) params.set("priority", filter.priority);
     const query = params.size ? `?${params}` : "";
     const response = await this.request(
       `${this.baseURL}/issues/${workspaceId}/${projectSlug}${query}`,

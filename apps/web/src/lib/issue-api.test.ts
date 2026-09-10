@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { IssueApi } from "./issue-api";
 
 describe("IssueApi", () => {
-  it("lists project issues with status and assignee filters", async () => {
+  it("lists project issues with status, assignee, and priority filters", async () => {
     const request = vi
       .fn()
       .mockResolvedValue(
@@ -16,11 +16,12 @@ describe("IssueApi", () => {
       api.list("workspace-1", "website", {
         status: "IN_PROGRESS",
         assigneeId: "user-1",
+        priority: "HIGH",
       }),
     ).resolves.toEqual([{ id: "issue-1", title: "Ship it" }]);
 
     expect(request).toHaveBeenCalledWith(
-      "/api/v1/issues/workspace-1/website?status=IN_PROGRESS&assigneeId=user-1",
+      "/api/v1/issues/workspace-1/website?status=IN_PROGRESS&assigneeId=user-1&priority=HIGH",
     );
   });
 
