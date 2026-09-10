@@ -499,7 +499,8 @@ export default function ProjectPage() {
                       >
                         <span className="font-medium">{issue.title}</span>
                         <span className="text-xs text-muted-foreground">
-                          {issue.priority} · {member?.name || member?.email || "Unassigned"}
+                          {issue.priority} ·{" "}
+                          {member?.name || member?.email || "Unassigned"}
                         </span>
                       </Link>
                     );

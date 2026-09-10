@@ -45,8 +45,7 @@ let rejectNextUpdate = false;
 let workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
 let currentUserId: string;
 let updateResponder:
-  | ((url: string, init: RequestInit) => Response | Promise<Response>)
-  | null;
+  ((url: string, init: RequestInit) => Response | Promise<Response>) | null;
 
 const protectedRequest = vi.fn(
   async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -126,7 +125,9 @@ const protectedRequest = vi.fn(
         if (updateResponder) return updateResponder(url, init);
         if (rejectNextUpdate) {
           return new Response(
-            JSON.stringify({ error: { message: "You cannot move this issue." } }),
+            JSON.stringify({
+              error: { message: "You cannot move this issue." },
+            }),
             { status: 403 },
           );
         }
@@ -266,7 +267,10 @@ describe("ProjectPage", () => {
       ),
     );
     expect(within(target).getByText("Ship the redesign")).toBeTruthy();
-    expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "issue-todo");
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      "text/plain",
+      "issue-todo",
+    );
   });
 
   it("rolls a card back to its original column when moving it is forbidden", async () => {
@@ -302,7 +306,9 @@ describe("ProjectPage", () => {
     fireEvent.drop(target, { dataTransfer });
 
     expect(
-      protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+      protectedRequest.mock.calls.filter(
+        ([, init]) => init?.method === "PATCH",
+      ),
     ).toHaveLength(0);
   });
 
@@ -326,7 +332,9 @@ describe("ProjectPage", () => {
 
     await waitFor(() =>
       expect(
-        protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+        protectedRequest.mock.calls.filter(
+          ([, init]) => init?.method === "PATCH",
+        ),
       ).toHaveLength(1),
     );
   });
@@ -356,7 +364,9 @@ describe("ProjectPage", () => {
     );
     await waitFor(() =>
       expect(
-        protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+        protectedRequest.mock.calls.filter(
+          ([, init]) => init?.method === "PATCH",
+        ),
       ).toHaveLength(1),
     );
   });
@@ -383,7 +393,8 @@ describe("ProjectPage", () => {
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
 
-    const pendingCard = await within(inProgress).findByText("Ship the redesign");
+    const pendingCard =
+      await within(inProgress).findByText("Ship the redesign");
     expect(pendingCard.closest("a")?.getAttribute("draggable")).toBe("false");
 
     const done = screen.getByLabelText("Done");
@@ -393,7 +404,9 @@ describe("ProjectPage", () => {
     fireEvent.drop(done, { dataTransfer: secondDrag });
 
     expect(
-      protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+      protectedRequest.mock.calls.filter(
+        ([, init]) => init?.method === "PATCH",
+      ),
     ).toHaveLength(1);
     expect(within(done).queryByText("Ship the redesign")).toBeNull();
 
@@ -415,8 +428,12 @@ describe("ProjectPage", () => {
         });
       }
       const inputBody = JSON.parse(String(init.body)) as Partial<TestIssue>;
-      const current = responseIssues.find((item) => url.endsWith(`/${item.id}`));
-      return new Response(JSON.stringify({ issue: { ...current, ...inputBody } }));
+      const current = responseIssues.find((item) =>
+        url.endsWith(`/${item.id}`),
+      );
+      return new Response(
+        JSON.stringify({ issue: { ...current, ...inputBody } }),
+      );
     };
     render(<ProjectPage />);
 
@@ -453,8 +470,12 @@ describe("ProjectPage", () => {
         });
       }
       const inputBody = JSON.parse(String(init.body)) as Partial<TestIssue>;
-      const current = responseIssues.find((item) => url.endsWith(`/${item.id}`));
-      return new Response(JSON.stringify({ issue: { ...current, ...inputBody } }));
+      const current = responseIssues.find((item) =>
+        url.endsWith(`/${item.id}`),
+      );
+      return new Response(
+        JSON.stringify({ issue: { ...current, ...inputBody } }),
+      );
     };
     render(<ProjectPage />);
 
@@ -480,7 +501,9 @@ describe("ProjectPage", () => {
 
     await waitFor(() =>
       expect(
-        protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+        protectedRequest.mock.calls.filter(
+          ([, init]) => init?.method === "PATCH",
+        ),
       ).toHaveLength(2),
     );
   });
