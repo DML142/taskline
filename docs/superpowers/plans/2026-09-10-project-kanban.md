@@ -23,6 +23,7 @@
 ### Task 1: Add priority filtering to the issue API
 
 **Files:**
+
 - Modify: `apps/api/queries/issues.sql`
 - Modify: `apps/api/internal/platform/database/sqlc/issues.sql.go`
 - Modify: `apps/api/internal/issue/service.go`
@@ -32,6 +33,7 @@
 - Test: `apps/api/internal/issue/service_test.go`
 
 **Interfaces:**
+
 - Consumes: `Priority` (`LOW | MEDIUM | HIGH`), `ListFilter`, and `IssueApi.list` query conventions.
 - Produces: `ListFilter{Status Status, AssigneeID *uuid.UUID, Priority Priority}` and `GET /issues/{workspaceID}/{projectSlug}?status=&assigneeId=&priority=`.
 
@@ -148,10 +150,12 @@ git commit -m "feat: filter project issues by priority"
 ### Task 2: Expose the priority filter in the web API client
 
 **Files:**
+
 - Modify: `apps/web/src/lib/issue-api.ts`
 - Test: `apps/web/src/lib/issue-api.test.ts`
 
 **Interfaces:**
+
 - Consumes: `IssuePriority` and `IssueFilter` from `issue-api.ts`.
 - Produces: `IssueApi.list(workspaceId, projectSlug, { status?, assigneeId?, priority? })` encoding the three optional query parameters.
 
@@ -201,10 +205,12 @@ git commit -m "feat: expose issue priority filter"
 ### Task 3: Replace the issue list with a native Kanban board
 
 **Files:**
+
 - Modify: `apps/web/src/app/[workspaceSlug]/[projectSlug]/page.tsx`
 - Modify: `apps/web/src/app/[workspaceSlug]/[projectSlug]/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `IssueApi.create`, `IssueApi.update`, the extended `IssueApi.list`, `WorkspaceMember`, and current authenticated user id.
 - Produces: a three-column board with labelled drop targets; cards invoke `IssueApi.update` with a complete `IssueInput` and a replacement `status`.
 
@@ -278,9 +284,11 @@ git commit -m "feat: add project kanban board"
 ### Task 4: Run the complete verification suite and inspect the browser workflow
 
 **Files:**
+
 - Modify only if verification reveals a defect in a file listed above.
 
 **Interfaces:**
+
 - Consumes: completed API and web changes.
 - Produces: evidence that formatting, static analysis, tests, builds, and the actual browser workflow work together.
 
@@ -322,4 +330,3 @@ git commit -m "fix: verify project kanban workflow"
 ```
 
 Only create this commit if Step 1–3 required a correction; otherwise do not create an empty commit.
-
