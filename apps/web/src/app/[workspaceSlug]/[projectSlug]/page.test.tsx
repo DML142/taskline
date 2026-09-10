@@ -42,6 +42,11 @@ const issue = (
 
 let responseIssues: TestIssue[];
 let rejectNextUpdate = false;
+let workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
+let currentUserId: string;
+let updateResponder:
+  | ((url: string, init: RequestInit) => Response | Promise<Response>)
+  | null;
 
 const protectedRequest = vi.fn(
   async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -54,7 +59,7 @@ const protectedRequest = vi.fn(
               id: "workspace-1",
               name: "Platform",
               slug: "platform",
-              role: "OWNER",
+              role: workspaceRole,
               createdAt: "2026-09-10T00:00:00Z",
               updatedAt: "2026-09-10T00:00:00Z",
             },
@@ -118,6 +123,7 @@ const protectedRequest = vi.fn(
         );
       }
       if (init?.method === "PATCH") {
+        if (updateResponder) return updateResponder(url, init);
         if (rejectNextUpdate) {
           return new Response(
             JSON.stringify({ error: { message: "You cannot move this issue." } }),
@@ -144,7 +150,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/features/auth/auth-context", () => ({
-  useAuth: () => ({ protectedRequest, user: { id: "owner-1" } }),
+  useAuth: () => ({ protectedRequest, user: { id: currentUserId } }),
 }));
 
 import ProjectPage from "./page";
@@ -157,6 +163,9 @@ describe("ProjectPage", () => {
       issue("issue-done", "Publish the brief", "DONE", "LOW"),
     ];
     rejectNextUpdate = false;
+    workspaceRole = "OWNER";
+    currentUserId = "owner-1";
+    updateResponder = null;
     protectedRequest.mockClear();
   });
 
@@ -209,6 +218,21 @@ describe("ProjectPage", () => {
     await user.selectOptions(screen.getByLabelText("Issue priority"), "LOW");
     await user.click(screen.getByRole("button", { name: "Create issue" }));
 
+    await waitFor(() =>
+      expect(protectedRequest).toHaveBeenCalledWith(
+        expect.stringContaining("/issues/workspace-1/website"),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            title: "Plan the launch",
+            description: "Coordinate the team",
+            status: "TODO",
+            priority: "LOW",
+            assigneeId: null,
+          }),
+        }),
+      ),
+    );
     expect(
       await within(screen.getByLabelText("To do")).findByText(
         "Plan the launch",
@@ -261,5 +285,158 @@ describe("ProjectPage", () => {
       "You cannot move this issue.",
     );
     expect(within(todo).getByText("Ship the redesign")).toBeTruthy();
+  });
+
+  it("does not make an assigned viewer card draggable or send an update", async () => {
+    workspaceRole = "VIEWER";
+    currentUserId = "viewer-1";
+    responseIssues[0].assigneeId = "viewer-1";
+    render(<ProjectPage />);
+
+    const card = await screen.findByText("Ship the redesign");
+    const target = screen.getByLabelText("In progress");
+    const dataTransfer = { getData: vi.fn(), setData: vi.fn() };
+    expect(card.closest("a")?.getAttribute("draggable")).toBe("false");
+    fireEvent.dragStart(card, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    expect(
+      protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+    ).toHaveLength(0);
+  });
+
+  it("allows a member to move only their assigned card", async () => {
+    workspaceRole = "MEMBER";
+    currentUserId = "member-1";
+    responseIssues[0].assigneeId = "member-1";
+    responseIssues[1].assigneeId = "member-2";
+    render(<ProjectPage />);
+
+    const ownCard = await screen.findByText("Ship the redesign");
+    const otherCard = screen.getByText("Review the copy");
+    expect(ownCard.closest("a")?.getAttribute("draggable")).toBe("true");
+    expect(otherCard.closest("a")?.getAttribute("draggable")).toBe("false");
+
+    const target = screen.getByLabelText("In progress");
+    const dataTransfer = { setData: vi.fn() };
+    fireEvent.dragStart(ownCard, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    await waitFor(() =>
+      expect(
+        protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+      ).toHaveLength(1),
+    );
+  });
+
+  it("shows the optimistic card position before its PATCH resolves", async () => {
+    let resolveUpdate: (response: Response) => void = () => undefined;
+    updateResponder = () =>
+      new Promise<Response>((resolve) => {
+        resolveUpdate = resolve;
+      });
+    render(<ProjectPage />);
+
+    const card = await screen.findByText("Ship the redesign");
+    const target = screen.getByLabelText("In progress");
+    const dataTransfer = { setData: vi.fn() };
+    fireEvent.dragStart(card, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    expect(within(target).getByText("Ship the redesign")).toBeTruthy();
+    resolveUpdate(
+      new Response(
+        JSON.stringify({
+          issue: { ...responseIssues[0], status: "IN_PROGRESS" },
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+      ).toHaveLength(1),
+    );
+  });
+
+  it("preserves a later successful move when an earlier move is rejected", async () => {
+    let rejectFirstMove: (response: Response) => void = () => undefined;
+    updateResponder = (url, init) => {
+      if (url.endsWith("/issue-todo")) {
+        return new Promise<Response>((resolve) => {
+          rejectFirstMove = resolve;
+        });
+      }
+      const inputBody = JSON.parse(String(init.body)) as Partial<TestIssue>;
+      const current = responseIssues.find((item) => url.endsWith(`/${item.id}`));
+      return new Response(JSON.stringify({ issue: { ...current, ...inputBody } }));
+    };
+    render(<ProjectPage />);
+
+    const todoCard = await screen.findByText("Ship the redesign");
+    const inProgress = screen.getByLabelText("In progress");
+    fireEvent.dragStart(todoCard, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
+
+    const progressCard = screen.getByText("Review the copy");
+    const done = screen.getByLabelText("Done");
+    fireEvent.dragStart(progressCard, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(done, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(done, { dataTransfer: { setData: vi.fn() } });
+
+    expect(await within(done).findByText("Review the copy")).toBeTruthy();
+    rejectFirstMove(
+      new Response(
+        JSON.stringify({ error: { message: "You cannot move this issue." } }),
+        { status: 403 },
+      ),
+    );
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(within(done).getByText("Review the copy")).toBeTruthy();
+  });
+
+  it("keeps a later drag active while an earlier request settles", async () => {
+    let rejectFirstMove: (response: Response) => void = () => undefined;
+    updateResponder = (url, init) => {
+      if (url.endsWith("/issue-todo")) {
+        return new Promise<Response>((resolve) => {
+          rejectFirstMove = resolve;
+        });
+      }
+      const inputBody = JSON.parse(String(init.body)) as Partial<TestIssue>;
+      const current = responseIssues.find((item) => url.endsWith(`/${item.id}`));
+      return new Response(JSON.stringify({ issue: { ...current, ...inputBody } }));
+    };
+    render(<ProjectPage />);
+
+    const todoCard = await screen.findByText("Ship the redesign");
+    const inProgress = screen.getByLabelText("In progress");
+    fireEvent.dragStart(todoCard, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
+
+    const progressCard = screen.getByText("Review the copy");
+    const done = screen.getByLabelText("Done");
+    const laterDataTransfer = { getData: vi.fn(() => ""), setData: vi.fn() };
+    fireEvent.dragStart(progressCard, { dataTransfer: laterDataTransfer });
+    rejectFirstMove(
+      new Response(
+        JSON.stringify({ error: { message: "You cannot move this issue." } }),
+        { status: 403 },
+      ),
+    );
+    await screen.findByRole("alert");
+    fireEvent.dragOver(done, { dataTransfer: laterDataTransfer });
+    fireEvent.drop(done, { dataTransfer: laterDataTransfer });
+
+    await waitFor(() =>
+      expect(
+        protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+      ).toHaveLength(2),
+    );
   });
 });

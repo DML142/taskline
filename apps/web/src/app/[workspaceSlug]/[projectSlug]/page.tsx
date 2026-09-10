@@ -183,14 +183,18 @@ export default function ProjectPage() {
         Loading project…
       </main>
     );
-  const canManage = workspace.role === "OWNER" || workspace.role === "ADMIN";
-  const canCreateIssue = canManage || workspace.role === "MEMBER";
+  const workspaceRole = workspace.role;
+  const canManage = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
+  const canCreateIssue = canManage || workspaceRole === "MEMBER";
   const assignableMembers = canManage
     ? members
     : members.filter((member) => member.userId === user?.id);
 
   function canMoveIssue(issue: Issue) {
-    return canManage || issue.assigneeId === user?.id;
+    return (
+      canManage ||
+      (workspaceRole === "MEMBER" && issue.assigneeId === user?.id)
+    );
   }
 
   function clearDragState() {
@@ -234,7 +238,6 @@ export default function ProjectPage() {
       return;
     }
 
-    const previousIssues = issues;
     const optimisticIssue = { ...issue, status: targetStatus };
     const input: IssueInput = {
       title: issue.title,
@@ -247,6 +250,7 @@ export default function ProjectPage() {
     setIssues((current) =>
       current.map((item) => (item.id === issue.id ? optimisticIssue : item)),
     );
+    clearDragState();
     try {
       const updated = await issueApi.update(
         workspace.id,
@@ -258,12 +262,12 @@ export default function ProjectPage() {
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
     } catch (caught) {
-      setIssues(previousIssues);
+      setIssues((current) =>
+        current.map((item) => (item.id === issue.id ? issue : item)),
+      );
       setError(
         caught instanceof Error ? caught.message : "Unable to update issue.",
       );
-    } finally {
-      clearDragState();
     }
   }
 
