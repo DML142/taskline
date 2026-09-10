@@ -62,6 +62,7 @@ type UpdateInput CreateInput
 type ListFilter struct {
 	Status     Status
 	AssigneeID *uuid.UUID
+	Priority   Priority
 }
 
 type Repository interface {
@@ -83,6 +84,9 @@ func (s *Service) List(ctx context.Context, actorID, workspaceID uuid.UUID, proj
 		return nil, err
 	}
 	if filter.Status != "" && !validStatus(filter.Status) {
+		return nil, ErrInvalidRequest
+	}
+	if filter.Priority != "" && !validPriority(filter.Priority) {
 		return nil, ErrInvalidRequest
 	}
 	if err := s.validAssignee(ctx, workspaceID, filter.AssigneeID); err != nil {

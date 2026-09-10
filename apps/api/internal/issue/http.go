@@ -100,7 +100,13 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 }
 
 func listFilter(r *http.Request) (ListFilter, error) {
-	filter := ListFilter{Status: Status(r.URL.Query().Get("status"))}
+	filter := ListFilter{
+		Status:   Status(r.URL.Query().Get("status")),
+		Priority: Priority(r.URL.Query().Get("priority")),
+	}
+	if filter.Priority != "" && !validPriority(filter.Priority) {
+		return ListFilter{}, ErrInvalidRequest
+	}
 	if assignee := r.URL.Query().Get("assigneeId"); assignee != "" {
 		assigneeID, err := uuid.Parse(assignee)
 		if err != nil {

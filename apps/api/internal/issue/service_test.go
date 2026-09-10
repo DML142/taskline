@@ -54,6 +54,16 @@ func TestListRejectsAssigneeOutsideWorkspace(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidAssignee)
 }
 
+func TestListAcceptsPriorityFilter(t *testing.T) {
+	repository := &fakeRepository{role: workspace.RoleViewer}
+	service := NewService(repository)
+
+	_, err := service.List(context.Background(), uuid.New(), uuid.New(), "website-redesign", ListFilter{Priority: PriorityHigh})
+
+	require.NoError(t, err)
+	require.Equal(t, PriorityHigh, repository.listFilter.Priority)
+}
+
 func TestUpdateAllowsMemberOnlyForOwnAssignedIssue(t *testing.T) {
 	actorID := uuid.New()
 	repository := &fakeRepository{role: workspace.RoleMember, member: true, issue: Issue{ID: uuid.New(), AssigneeID: &actorID}}
@@ -80,10 +90,11 @@ func TestUpdateRejectsMemberForUnassignedIssue(t *testing.T) {
 }
 
 type fakeRepository struct {
-	role      workspace.Role
-	member    bool
-	issue     Issue
-	creatorID uuid.UUID
+	role       workspace.Role
+	member     bool
+	issue      Issue
+	creatorID  uuid.UUID
+	listFilter ListFilter
 }
 
 func (r *fakeRepository) Role(context.Context, uuid.UUID, uuid.UUID) (workspace.Role, error) {
@@ -99,7 +110,8 @@ func (r *fakeRepository) Create(_ context.Context, _ uuid.UUID, creatorID uuid.U
 	r.creatorID = creatorID
 	return Issue{ID: uuid.New(), Title: input.Title, Status: input.Status, Priority: input.Priority}, nil
 }
-func (r *fakeRepository) List(context.Context, uuid.UUID, ListFilter) ([]Issue, error) {
+func (r *fakeRepository) List(_ context.Context, _ uuid.UUID, filter ListFilter) ([]Issue, error) {
+	r.listFilter = filter
 	return nil, nil
 }
 func (r *fakeRepository) Get(context.Context, uuid.UUID, uuid.UUID) (Issue, error) {
