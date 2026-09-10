@@ -65,6 +65,9 @@ export default function ProjectPage() {
   const [activeDropStatus, setActiveDropStatus] = useState<IssueStatus | null>(
     null,
   );
+  const [inFlightIssueIds, setInFlightIssueIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     workspaceApi
@@ -192,8 +195,9 @@ export default function ProjectPage() {
 
   function canMoveIssue(issue: Issue) {
     return (
-      canManage ||
-      (workspaceRole === "MEMBER" && issue.assigneeId === user?.id)
+      !inFlightIssueIds.has(issue.id) &&
+      (canManage ||
+        (workspaceRole === "MEMBER" && issue.assigneeId === user?.id))
     );
   }
 
@@ -250,6 +254,7 @@ export default function ProjectPage() {
     setIssues((current) =>
       current.map((item) => (item.id === issue.id ? optimisticIssue : item)),
     );
+    setInFlightIssueIds((current) => new Set(current).add(issue.id));
     clearDragState();
     try {
       const updated = await issueApi.update(
@@ -268,6 +273,12 @@ export default function ProjectPage() {
       setError(
         caught instanceof Error ? caught.message : "Unable to update issue.",
       );
+    } finally {
+      setInFlightIssueIds((current) => {
+        const next = new Set(current);
+        next.delete(issue.id);
+        return next;
+      });
     }
   }
 

@@ -361,6 +361,51 @@ describe("ProjectPage", () => {
     );
   });
 
+  it("does not allow a second move of a card while its first PATCH is pending", async () => {
+    let resolveFirstUpdate: (response: Response) => void = () => undefined;
+    let updateCount = 0;
+    updateResponder = () => {
+      updateCount += 1;
+      if (updateCount === 1) {
+        return new Promise<Response>((resolve) => {
+          resolveFirstUpdate = resolve;
+        });
+      }
+      return new Response(
+        JSON.stringify({ issue: { ...responseIssues[0], status: "DONE" } }),
+      );
+    };
+    render(<ProjectPage />);
+
+    const todoCard = await screen.findByText("Ship the redesign");
+    const inProgress = screen.getByLabelText("In progress");
+    fireEvent.dragStart(todoCard, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
+
+    const pendingCard = await within(inProgress).findByText("Ship the redesign");
+    expect(pendingCard.closest("a")?.getAttribute("draggable")).toBe("false");
+
+    const done = screen.getByLabelText("Done");
+    const secondDrag = { getData: vi.fn(() => ""), setData: vi.fn() };
+    fireEvent.dragStart(pendingCard, { dataTransfer: secondDrag });
+    fireEvent.dragOver(done, { dataTransfer: secondDrag });
+    fireEvent.drop(done, { dataTransfer: secondDrag });
+
+    expect(
+      protectedRequest.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+    ).toHaveLength(1);
+    expect(within(done).queryByText("Ship the redesign")).toBeNull();
+
+    resolveFirstUpdate(
+      new Response(
+        JSON.stringify({
+          issue: { ...responseIssues[0], status: "IN_PROGRESS" },
+        }),
+      ),
+    );
+  });
+
   it("preserves a later successful move when an earlier move is rejected", async () => {
     let rejectFirstMove: (response: Response) => void = () => undefined;
     updateResponder = (url, init) => {
