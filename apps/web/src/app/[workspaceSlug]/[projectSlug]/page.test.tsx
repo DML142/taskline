@@ -46,6 +46,10 @@ let workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
 let currentUserId: string;
 let updateResponder:
   ((url: string, init: RequestInit) => Response | Promise<Response>) | null;
+let listResponder: ((url: string) => Response | Promise<Response>) | null;
+let createResponder:
+  | ((url: string, init: RequestInit) => Response | Promise<Response>)
+  | null;
 
 const protectedRequest = vi.fn(
   async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -100,6 +104,7 @@ const protectedRequest = vi.fn(
     }
     if (url.includes("/issues/workspace-1/website")) {
       if (init?.method === "POST") {
+        if (createResponder) return createResponder(url, init);
         const inputBody = JSON.parse(String(init.body)) as {
           title: string;
           description: string;
@@ -139,6 +144,7 @@ const protectedRequest = vi.fn(
           JSON.stringify({ issue: { ...current, ...inputBody } }),
         );
       }
+      if (listResponder) return listResponder(url);
       return new Response(JSON.stringify({ issues: responseIssues }));
     }
     return new Response(null, { status: 404 });
@@ -167,6 +173,8 @@ describe("ProjectPage", () => {
     workspaceRole = "OWNER";
     currentUserId = "owner-1";
     updateResponder = null;
+    listResponder = null;
+    createResponder = null;
     protectedRequest.mockClear();
   });
 
@@ -204,6 +212,134 @@ describe("ProjectPage", () => {
         expect.stringContaining("priority=HIGH"),
       ),
     );
+  });
+
+  it("removes a moved card that no longer matches the active status filter", async () => {
+    listResponder = (url) =>
+      new Response(
+        JSON.stringify({
+          issues: url.includes("status=TODO")
+            ? responseIssues.filter((item) => item.status === "TODO")
+            : responseIssues,
+        }),
+      );
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    await screen.findByText("Ship the redesign");
+    await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
+    await waitFor(() =>
+      expect(within(screen.getByLabelText("In progress")).queryByText("Review the copy")).toBeNull(),
+    );
+
+    const card = screen.getByText("Ship the redesign");
+    const inProgress = screen.getByLabelText("In progress");
+    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
+
+    await waitFor(() => expect(screen.queryByText("Ship the redesign")).toBeNull());
+  });
+
+  it("restores a rejected move only when the original card matches active filters", async () => {
+    listResponder = (url) =>
+      new Response(
+        JSON.stringify({
+          issues: url.includes("status=TODO")
+            ? responseIssues.filter((item) => item.status === "TODO")
+            : responseIssues,
+        }),
+      );
+    rejectNextUpdate = true;
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    await screen.findByText("Ship the redesign");
+    await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
+    await waitFor(() =>
+      expect(within(screen.getByLabelText("In progress")).queryByText("Review the copy")).toBeNull(),
+    );
+
+    const card = screen.getByText("Ship the redesign");
+    const inProgress = screen.getByLabelText("In progress");
+    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
+
+    expect(
+      await within(screen.getByLabelText("To do")).findByText(
+        "Ship the redesign",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("does not add a created issue that fails active filters", async () => {
+    listResponder = () => new Response(JSON.stringify({ issues: [] }));
+    createResponder = () =>
+      new Response(
+        JSON.stringify({
+          issue: {
+            ...issue("issue-created", "Hidden issue", "TODO", "LOW"),
+            assigneeId: "member-2",
+          },
+        }),
+      );
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    await screen.findByRole("heading", { name: "To do" });
+    await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
+    await user.selectOptions(screen.getByLabelText("Priority"), "HIGH");
+    await user.selectOptions(screen.getAllByLabelText("Assignee")[0], "owner-1");
+    await user.type(screen.getByLabelText("Title"), "Hidden issue");
+    await user.click(screen.getByRole("button", { name: "Create issue" }));
+
+    expect(screen.queryByText("Hidden issue")).toBeNull();
+  });
+
+  it("ignores a stale list response that resolves after a confirmed move", async () => {
+    let resolveStaleList: (response: Response) => void = () => undefined;
+    let staleListStarted = false;
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    await screen.findByText("Ship the redesign");
+    listResponder = () =>
+      new Promise<Response>((resolve) => {
+        staleListStarted = true;
+        resolveStaleList = resolve;
+      });
+    await user.selectOptions(screen.getByLabelText("Priority"), "HIGH");
+    await waitFor(() => expect(staleListStarted).toBe(true));
+
+    const card = screen.getByText("Ship the redesign");
+    const inProgress = screen.getByLabelText("In progress");
+    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
+    expect(await within(inProgress).findByText("Ship the redesign")).toBeTruthy();
+
+    resolveStaleList(new Response(JSON.stringify({ issues: responseIssues })));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(within(screen.getByLabelText("To do")).queryByText("Ship the redesign")).toBeNull();
+    expect(within(inProgress).getByText("Ship the redesign")).toBeTruthy();
+  });
+
+  it("clears a column highlight only after the drag leaves the column", async () => {
+    render(<ProjectPage />);
+
+    const card = await screen.findByText("Ship the redesign");
+    const target = screen.getByLabelText("In progress");
+    const dataTransfer = { setData: vi.fn() };
+    fireEvent.dragStart(card, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    expect(target.className).toContain("border-primary");
+
+    const heading = within(target).getByRole("heading", { name: "In progress" });
+    fireEvent.dragLeave(heading, { relatedTarget: heading });
+    expect(target.className).toContain("border-primary");
+    fireEvent.dragLeave(target, { relatedTarget: document.body });
+    expect(target.className).not.toContain("border-primary");
   });
 
   it("adds a quick-created issue to the To do column", async () => {

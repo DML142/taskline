@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/features/auth/auth-context";
 import { ProjectApi, type Project } from "@/lib/project-api";
 import {
@@ -68,6 +68,7 @@ export default function ProjectPage() {
   const [inFlightIssueIds, setInFlightIssueIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const listRequestGeneration = useRef(0);
 
   useEffect(() => {
     workspaceApi
@@ -100,18 +101,25 @@ export default function ProjectPage() {
 
   useEffect(() => {
     if (!workspace || !project) return;
+    const requestGeneration = ++listRequestGeneration.current;
     issueApi
       .list(workspace.id, project.slug, {
         status: statusFilter || undefined,
         assigneeId: assigneeFilter || undefined,
         priority: priorityFilter || undefined,
       })
-      .then(setIssues)
-      .catch((caught) =>
-        setError(
-          caught instanceof Error ? caught.message : "Unable to load issues.",
-        ),
-      );
+      .then((items) => {
+        if (listRequestGeneration.current === requestGeneration) {
+          setIssues(items);
+        }
+      })
+      .catch((caught) => {
+        if (listRequestGeneration.current === requestGeneration) {
+          setError(
+            caught instanceof Error ? caught.message : "Unable to load issues.",
+          );
+        }
+      });
   }, [
     assigneeFilter,
     issueApi,
@@ -149,6 +157,7 @@ export default function ProjectPage() {
   async function createIssue(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!workspace || !project) return;
+    listRequestGeneration.current += 1;
     setPending(true);
     setError(null);
     try {
@@ -159,7 +168,11 @@ export default function ProjectPage() {
         priority: issuePriority,
         assigneeId: issueAssignee || null,
       });
-      setIssues((current) => [created, ...current]);
+      setIssues((current) =>
+        matchesCurrentFilters(created)
+          ? [created, ...current.filter((issue) => issue.id !== created.id)]
+          : current,
+      );
       setIssueTitle("");
       setIssueDescription("");
       setIssuePriority("MEDIUM");
@@ -201,6 +214,21 @@ export default function ProjectPage() {
     );
   }
 
+  function matchesCurrentFilters(issue: Issue) {
+    return (
+      (!statusFilter || issue.status === statusFilter) &&
+      (!priorityFilter || issue.priority === priorityFilter) &&
+      (!assigneeFilter || issue.assigneeId === assigneeFilter)
+    );
+  }
+
+  function replaceFilteredIssue(current: Issue[], nextIssue: Issue) {
+    const withoutIssue = current.filter((issue) => issue.id !== nextIssue.id);
+    return matchesCurrentFilters(nextIssue)
+      ? [nextIssue, ...withoutIssue]
+      : withoutIssue;
+  }
+
   function clearDragState() {
     setDraggedIssueId(null);
     setActiveDropStatus(null);
@@ -226,6 +254,17 @@ export default function ProjectPage() {
     setActiveDropStatus(status);
   }
 
+  function handleDragLeave(
+    event: React.DragEvent<HTMLElement>,
+    status: IssueStatus,
+  ) {
+    if (event.currentTarget !== event.target) return;
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setActiveDropStatus((current) =>
+      current === status ? null : current,
+    );
+  }
+
   async function handleDrop(
     event: React.DragEvent<HTMLElement>,
     targetStatus: IssueStatus,
@@ -242,6 +281,7 @@ export default function ProjectPage() {
       return;
     }
 
+    listRequestGeneration.current += 1;
     const optimisticIssue = { ...issue, status: targetStatus };
     const input: IssueInput = {
       title: issue.title,
@@ -251,9 +291,7 @@ export default function ProjectPage() {
       status: targetStatus,
     };
     setError(null);
-    setIssues((current) =>
-      current.map((item) => (item.id === issue.id ? optimisticIssue : item)),
-    );
+    setIssues((current) => replaceFilteredIssue(current, optimisticIssue));
     setInFlightIssueIds((current) => new Set(current).add(issue.id));
     clearDragState();
     try {
@@ -263,13 +301,9 @@ export default function ProjectPage() {
         issue.id,
         input,
       );
-      setIssues((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
+      setIssues((current) => replaceFilteredIssue(current, updated));
     } catch (caught) {
-      setIssues((current) =>
-        current.map((item) => (item.id === issue.id ? issue : item)),
-      );
+      setIssues((current) => replaceFilteredIssue(current, issue));
       setError(
         caught instanceof Error ? caught.message : "Unable to update issue.",
       );
@@ -474,6 +508,7 @@ export default function ProjectPage() {
                 key={column.status}
                 aria-label={column.title}
                 onDragOver={(event) => handleDragOver(event, column.status)}
+                onDragLeave={(event) => handleDragLeave(event, column.status)}
                 onDrop={(event) => handleDrop(event, column.status)}
                 className={`min-h-52 rounded-lg border p-3 ${
                   activeDropStatus === column.status
