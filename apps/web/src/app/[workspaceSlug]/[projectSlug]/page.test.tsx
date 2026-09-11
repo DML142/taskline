@@ -161,6 +161,9 @@ vi.mock("@/features/auth/auth-context", () => ({
 
 import ProjectPage from "./page";
 
+const getColumn = (name: "To do" | "In progress" | "Done") =>
+  screen.getByRole("region", { name });
+
 describe("ProjectPage", () => {
   beforeEach(() => {
     responseIssues = [
@@ -187,15 +190,13 @@ describe("ProjectPage", () => {
     expect(screen.getByRole("heading", { name: "Done" })).toBeTruthy();
     expect(screen.getByLabelText("Priority")).toBeTruthy();
     expect(
-      await within(screen.getByLabelText("To do")).findByText(
-        "Ship the redesign",
-      ),
+      await within(getColumn("To do")).findByText("Ship the redesign"),
     ).toBeTruthy();
     expect(
-      within(screen.getByLabelText("In progress")).getByText("Review the copy"),
+      within(getColumn("In progress")).getByText("Review the copy"),
     ).toBeTruthy();
     expect(
-      within(screen.getByLabelText("Done")).getByText("Publish the brief"),
+      within(getColumn("Done")).getByText("Publish the brief"),
     ).toBeTruthy();
   });
 
@@ -213,73 +214,29 @@ describe("ProjectPage", () => {
     );
   });
 
-  it("removes a moved card that no longer matches the active status filter", async () => {
-    listResponder = (url) =>
-      new Response(
-        JSON.stringify({
-          issues: url.includes("status=TODO")
-            ? responseIssues.filter((item) => item.status === "TODO")
-            : responseIssues,
-        }),
-      );
+  it("shows only the Kanban columns selected by visible-column toggles", async () => {
     const user = userEvent.setup();
     render(<ProjectPage />);
 
     await screen.findByText("Ship the redesign");
-    await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
-    await waitFor(() =>
-      expect(
-        within(screen.getByLabelText("In progress")).queryByText(
-          "Review the copy",
-        ),
-      ).toBeNull(),
-    );
+    await user.click(screen.getByLabelText("Show To do"));
+    await user.click(screen.getByLabelText("Show Done"));
 
-    const card = screen.getByText("Ship the redesign");
-    const inProgress = screen.getByLabelText("In progress");
-    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
-    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
-    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
-
-    await waitFor(() =>
-      expect(screen.queryByText("Ship the redesign")).toBeNull(),
-    );
+    expect(screen.queryByRole("region", { name: "To do" })).toBeNull();
+    expect(getColumn("In progress")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Done" })).toBeNull();
   });
 
-  it("restores a rejected move only when the original card matches active filters", async () => {
-    listResponder = (url) =>
-      new Response(
-        JSON.stringify({
-          issues: url.includes("status=TODO")
-            ? responseIssues.filter((item) => item.status === "TODO")
-            : responseIssues,
-        }),
-      );
-    rejectNextUpdate = true;
+  it("keeps multiple selected Kanban columns visible", async () => {
     const user = userEvent.setup();
     render(<ProjectPage />);
 
     await screen.findByText("Ship the redesign");
-    await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
-    await waitFor(() =>
-      expect(
-        within(screen.getByLabelText("In progress")).queryByText(
-          "Review the copy",
-        ),
-      ).toBeNull(),
-    );
+    await user.click(screen.getByLabelText("Show In progress"));
 
-    const card = screen.getByText("Ship the redesign");
-    const inProgress = screen.getByLabelText("In progress");
-    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
-    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
-    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
-
-    expect(
-      await within(screen.getByLabelText("To do")).findByText(
-        "Ship the redesign",
-      ),
-    ).toBeTruthy();
+    expect(getColumn("To do")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "In progress" })).toBeNull();
+    expect(getColumn("Done")).toBeTruthy();
   });
 
   it("does not add a created issue that fails active filters", async () => {
@@ -297,10 +254,9 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     await screen.findByRole("heading", { name: "To do" });
-    await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
     await user.selectOptions(screen.getByLabelText("Priority"), "HIGH");
     await user.selectOptions(
-      screen.getAllByLabelText("Assignee")[0],
+      screen.getByLabelText("Filter by assignee"),
       "owner-1",
     );
     await user.type(screen.getByLabelText("Title"), "Hidden issue");
@@ -347,7 +303,7 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const card = await screen.findByText("Ship the redesign");
-    const inProgress = screen.getByLabelText("In progress");
+    const inProgress = getColumn("In progress");
     fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
@@ -382,7 +338,7 @@ describe("ProjectPage", () => {
     await waitFor(() => expect(staleListStarted).toBe(true));
 
     const card = screen.getByText("Ship the redesign");
-    const inProgress = screen.getByLabelText("In progress");
+    const inProgress = getColumn("In progress");
     fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
@@ -393,7 +349,7 @@ describe("ProjectPage", () => {
     resolveStaleList(new Response(JSON.stringify({ issues: responseIssues })));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(
-      within(screen.getByLabelText("To do")).queryByText("Ship the redesign"),
+      within(getColumn("To do")).queryByText("Ship the redesign"),
     ).toBeNull();
     expect(within(inProgress).getByText("Ship the redesign")).toBeTruthy();
   });
@@ -402,7 +358,7 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const card = await screen.findByText("Ship the redesign");
-    const target = screen.getByLabelText("In progress");
+    const target = getColumn("In progress");
     const dataTransfer = { setData: vi.fn() };
     fireEvent.dragStart(card, { dataTransfer });
     fireEvent.dragOver(target, { dataTransfer });
@@ -446,9 +402,7 @@ describe("ProjectPage", () => {
       ),
     );
     expect(
-      await within(screen.getByLabelText("To do")).findByText(
-        "Plan the launch",
-      ),
+      await within(getColumn("To do")).findByText("Plan the launch"),
     ).toBeTruthy();
   });
 
@@ -456,7 +410,7 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const card = await screen.findByText("Ship the redesign");
-    const target = screen.getByLabelText("In progress");
+    const target = getColumn("In progress");
     const dataTransfer = { setData: vi.fn() };
     fireEvent.dragStart(card, { dataTransfer });
     fireEvent.dragOver(target, { dataTransfer });
@@ -489,8 +443,8 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const card = await screen.findByText("Ship the redesign");
-    const todo = screen.getByLabelText("To do");
-    const target = screen.getByLabelText("In progress");
+    const todo = getColumn("To do");
+    const target = getColumn("In progress");
     const dataTransfer = { setData: vi.fn() };
     fireEvent.dragStart(card, { dataTransfer });
     fireEvent.dragOver(target, { dataTransfer });
@@ -509,7 +463,7 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const card = await screen.findByText("Ship the redesign");
-    const target = screen.getByLabelText("In progress");
+    const target = getColumn("In progress");
     const dataTransfer = { getData: vi.fn(), setData: vi.fn() };
     expect(card.closest("a")?.getAttribute("draggable")).toBe("false");
     fireEvent.dragStart(card, { dataTransfer });
@@ -535,7 +489,7 @@ describe("ProjectPage", () => {
     expect(ownCard.closest("a")?.getAttribute("draggable")).toBe("true");
     expect(otherCard.closest("a")?.getAttribute("draggable")).toBe("false");
 
-    const target = screen.getByLabelText("In progress");
+    const target = getColumn("In progress");
     const dataTransfer = { setData: vi.fn() };
     fireEvent.dragStart(ownCard, { dataTransfer });
     fireEvent.dragOver(target, { dataTransfer });
@@ -559,7 +513,7 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const card = await screen.findByText("Ship the redesign");
-    const target = screen.getByLabelText("In progress");
+    const target = getColumn("In progress");
     const dataTransfer = { setData: vi.fn() };
     fireEvent.dragStart(card, { dataTransfer });
     fireEvent.dragOver(target, { dataTransfer });
@@ -599,7 +553,7 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const todoCard = await screen.findByText("Ship the redesign");
-    const inProgress = screen.getByLabelText("In progress");
+    const inProgress = getColumn("In progress");
     fireEvent.dragStart(todoCard, { dataTransfer: { setData: vi.fn() } });
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
@@ -608,7 +562,7 @@ describe("ProjectPage", () => {
       await within(inProgress).findByText("Ship the redesign");
     expect(pendingCard.closest("a")?.getAttribute("draggable")).toBe("false");
 
-    const done = screen.getByLabelText("Done");
+    const done = getColumn("Done");
     const secondDrag = { getData: vi.fn(() => ""), setData: vi.fn() };
     fireEvent.dragStart(pendingCard, { dataTransfer: secondDrag });
     fireEvent.dragOver(done, { dataTransfer: secondDrag });
@@ -649,13 +603,13 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const todoCard = await screen.findByText("Ship the redesign");
-    const inProgress = screen.getByLabelText("In progress");
+    const inProgress = getColumn("In progress");
     fireEvent.dragStart(todoCard, { dataTransfer: { setData: vi.fn() } });
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
 
     const progressCard = screen.getByText("Review the copy");
-    const done = screen.getByLabelText("Done");
+    const done = getColumn("Done");
     fireEvent.dragStart(progressCard, { dataTransfer: { setData: vi.fn() } });
     fireEvent.dragOver(done, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(done, { dataTransfer: { setData: vi.fn() } });
@@ -691,13 +645,13 @@ describe("ProjectPage", () => {
     render(<ProjectPage />);
 
     const todoCard = await screen.findByText("Ship the redesign");
-    const inProgress = screen.getByLabelText("In progress");
+    const inProgress = getColumn("In progress");
     fireEvent.dragStart(todoCard, { dataTransfer: { setData: vi.fn() } });
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
 
     const progressCard = screen.getByText("Review the copy");
-    const done = screen.getByLabelText("Done");
+    const done = getColumn("Done");
     const laterDataTransfer = { getData: vi.fn(() => ""), setData: vi.fn() };
     fireEvent.dragStart(progressCard, { dataTransfer: laterDataTransfer });
     rejectFirstMove(

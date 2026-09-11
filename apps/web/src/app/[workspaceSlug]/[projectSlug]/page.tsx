@@ -25,14 +25,12 @@ const boardColumns: ReadonlyArray<{ status: IssueStatus; title: string }> = [
 ];
 
 type IssueFilters = {
-  status: "" | IssueStatus;
   priority: "" | IssuePriority;
   assigneeId: string;
 };
 
 function matchesIssueFilters(issue: Issue, filters: IssueFilters) {
   return (
-    (!filters.status || issue.status === filters.status) &&
     (!filters.priority || issue.priority === filters.priority) &&
     (!filters.assigneeId || issue.assigneeId === filters.assigneeId)
   );
@@ -68,7 +66,9 @@ export default function ProjectPage() {
   const [pending, setPending] = useState(false);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"" | IssueStatus>("");
+  const [visibleStatuses, setVisibleStatuses] = useState<IssueStatus[]>(
+    boardColumns.map((column) => column.status),
+  );
   const [priorityFilter, setPriorityFilter] = useState<"" | IssuePriority>("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [issueTitle, setIssueTitle] = useState("");
@@ -84,7 +84,6 @@ export default function ProjectPage() {
   );
   const listRequestGeneration = useRef(0);
   const filtersRef = useRef<IssueFilters>({
-    status: statusFilter,
     priority: priorityFilter,
     assigneeId: assigneeFilter,
   });
@@ -123,7 +122,6 @@ export default function ProjectPage() {
     const requestGeneration = ++listRequestGeneration.current;
     issueApi
       .list(workspace.id, project.slug, {
-        status: statusFilter || undefined,
         assigneeId: assigneeFilter || undefined,
         priority: priorityFilter || undefined,
       })
@@ -139,14 +137,7 @@ export default function ProjectPage() {
           );
         }
       });
-  }, [
-    assigneeFilter,
-    issueApi,
-    priorityFilter,
-    project,
-    statusFilter,
-    workspace,
-  ]);
+  }, [assigneeFilter, issueApi, priorityFilter, project, workspace]);
 
   async function update(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -402,25 +393,35 @@ export default function ProjectPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Issues</h2>
           <div className="flex flex-wrap gap-3">
+            <fieldset className="grid gap-1 text-sm font-medium">
+              <legend>Visible columns</legend>
+              <div className="flex flex-wrap gap-3">
+                {boardColumns.map((column) => (
+                  <label
+                    key={column.status}
+                    className="flex items-center gap-1 font-normal"
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={`Show ${column.title}`}
+                      checked={visibleStatuses.includes(column.status)}
+                      onChange={() =>
+                        setVisibleStatuses((current) =>
+                          current.includes(column.status)
+                            ? current.filter(
+                                (status) => status !== column.status,
+                              )
+                            : [...current, column.status],
+                        )
+                      }
+                    />
+                    <span aria-hidden="true">{column.title}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <label className="grid gap-1 text-sm font-medium">
-              Filter status
-              <select
-                value={statusFilter}
-                onChange={(event) => {
-                  const status = event.target.value as "" | IssueStatus;
-                  filtersRef.current = { ...filtersRef.current, status };
-                  setStatusFilter(status);
-                }}
-                className="rounded-md border bg-background px-3 py-2 text-sm font-normal"
-              >
-                <option value="">All statuses</option>
-                <option value="TODO">To do</option>
-                <option value="IN_PROGRESS">In progress</option>
-                <option value="DONE">Done</option>
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Assignee
+              Filter by assignee
               <select
                 value={assigneeFilter}
                 onChange={(event) => {
@@ -497,7 +498,7 @@ export default function ProjectPage() {
                 </select>
               </label>
               <label className="grid gap-1 text-sm font-medium">
-                Assignee
+                Assign to
                 <select
                   value={issueAssignee}
                   onChange={(event) => setIssueAssignee(event.target.value)}
@@ -521,56 +522,58 @@ export default function ProjectPage() {
           </form>
         )}
         <div className="mt-4 grid gap-4 md:grid-cols-3">
-          {boardColumns.map((column) => {
-            const columnIssues = issues.filter(
-              (issue) => issue.status === column.status,
-            );
-            return (
-              <section
-                key={column.status}
-                aria-label={column.title}
-                onDragOver={(event) => handleDragOver(event, column.status)}
-                onDragLeave={(event) => handleDragLeave(event, column.status)}
-                onDrop={(event) => handleDrop(event, column.status)}
-                className={`min-h-52 rounded-lg border p-3 ${
-                  activeDropStatus === column.status
-                    ? "border-primary bg-muted"
-                    : "bg-muted/30"
-                }`}
-              >
-                <h3 className="text-sm font-semibold">{column.title}</h3>
-                <div className="mt-3 grid gap-2">
-                  {columnIssues.map((issue) => {
-                    const member = members.find(
-                      (member) => member.userId === issue.assigneeId,
-                    );
-                    const movable = canMoveIssue(issue);
-                    return (
-                      <Link
-                        key={issue.id}
-                        href={`/${workspace.slug}/${project.slug}/${issue.id}`}
-                        draggable={movable}
-                        onDragStart={(event) => handleDragStart(event, issue)}
-                        onDragEnd={clearDragState}
-                        className="grid gap-2 rounded-lg border bg-background px-4 py-3 hover:bg-muted"
-                      >
-                        <span className="font-medium">{issue.title}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {issue.priority} ·{" "}
-                          {member?.name || member?.email || "Unassigned"}
-                        </span>
-                      </Link>
-                    );
-                  })}
-                  {columnIssues.length === 0 && (
-                    <p className="rounded-md border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-                      No issues
-                    </p>
-                  )}
-                </div>
-              </section>
-            );
-          })}
+          {boardColumns
+            .filter((column) => visibleStatuses.includes(column.status))
+            .map((column) => {
+              const columnIssues = issues.filter(
+                (issue) => issue.status === column.status,
+              );
+              return (
+                <section
+                  key={column.status}
+                  aria-label={column.title}
+                  onDragOver={(event) => handleDragOver(event, column.status)}
+                  onDragLeave={(event) => handleDragLeave(event, column.status)}
+                  onDrop={(event) => handleDrop(event, column.status)}
+                  className={`min-h-52 rounded-lg border p-3 ${
+                    activeDropStatus === column.status
+                      ? "border-primary bg-muted"
+                      : "bg-muted/30"
+                  }`}
+                >
+                  <h3 className="text-sm font-semibold">{column.title}</h3>
+                  <div className="mt-3 grid gap-2">
+                    {columnIssues.map((issue) => {
+                      const member = members.find(
+                        (member) => member.userId === issue.assigneeId,
+                      );
+                      const movable = canMoveIssue(issue);
+                      return (
+                        <Link
+                          key={issue.id}
+                          href={`/${workspace.slug}/${project.slug}/${issue.id}`}
+                          draggable={movable}
+                          onDragStart={(event) => handleDragStart(event, issue)}
+                          onDragEnd={clearDragState}
+                          className="grid gap-2 rounded-lg border bg-background px-4 py-3 hover:bg-muted"
+                        >
+                          <span className="font-medium">{issue.title}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {issue.priority} ·{" "}
+                            {member?.name || member?.email || "Unassigned"}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                    {columnIssues.length === 0 && (
+                      <p className="rounded-md border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                        No issues
+                      </p>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
         </div>
       </section>
     </main>
