@@ -88,11 +88,6 @@ export default function ProjectPage() {
     priority: priorityFilter,
     assigneeId: assigneeFilter,
   });
-  filtersRef.current = {
-    status: statusFilter,
-    priority: priorityFilter,
-    assigneeId: assigneeFilter,
-  };
 
   useEffect(() => {
     workspaceApi
@@ -411,9 +406,11 @@ export default function ProjectPage() {
               Filter status
               <select
                 value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as "" | IssueStatus)
-                }
+                onChange={(event) => {
+                  const status = event.target.value as "" | IssueStatus;
+                  filtersRef.current = { ...filtersRef.current, status };
+                  setStatusFilter(status);
+                }}
                 className="rounded-md border bg-background px-3 py-2 text-sm font-normal"
               >
                 <option value="">All statuses</option>
@@ -426,7 +423,11 @@ export default function ProjectPage() {
               Assignee
               <select
                 value={assigneeFilter}
-                onChange={(event) => setAssigneeFilter(event.target.value)}
+                onChange={(event) => {
+                  const assigneeId = event.target.value;
+                  filtersRef.current = { ...filtersRef.current, assigneeId };
+                  setAssigneeFilter(assigneeId);
+                }}
                 className="rounded-md border bg-background px-3 py-2 text-sm font-normal"
               >
                 <option value="">All assignees</option>
@@ -441,9 +442,11 @@ export default function ProjectPage() {
               Priority
               <select
                 value={priorityFilter}
-                onChange={(event) =>
-                  setPriorityFilter(event.target.value as "" | IssuePriority)
-                }
+                onChange={(event) => {
+                  const priority = event.target.value as "" | IssuePriority;
+                  filtersRef.current = { ...filtersRef.current, priority };
+                  setPriorityFilter(priority);
+                }}
                 className="rounded-md border bg-background px-3 py-2 text-sm font-normal"
               >
                 <option value="">All priorities</option>
