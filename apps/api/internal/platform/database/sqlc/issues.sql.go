@@ -164,6 +164,59 @@ func (q *Queries) ListIssuesForProjectByAssignee(ctx context.Context, arg ListIs
 	return items, nil
 }
 
+const listIssuesForProjectByFilters = `-- name: ListIssuesForProjectByFilters :many
+SELECT id, project_id, title, description, status, priority, creator_id, assignee_id, created_at, updated_at
+FROM issues
+WHERE project_id = $1
+  AND ($2::text = '' OR status = $2)
+  AND ($3::uuid IS NULL OR assignee_id = $3)
+  AND ($4::text = '' OR priority = $4)
+ORDER BY created_at DESC, id DESC
+`
+
+type ListIssuesForProjectByFiltersParams struct {
+	ProjectID  uuid.UUID
+	Status     string
+	AssigneeID pgtype.UUID
+	Priority   string
+}
+
+func (q *Queries) ListIssuesForProjectByFilters(ctx context.Context, arg ListIssuesForProjectByFiltersParams) ([]Issue, error) {
+	rows, err := q.db.Query(ctx, listIssuesForProjectByFilters,
+		arg.ProjectID,
+		arg.Status,
+		arg.AssigneeID,
+		arg.Priority,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Issue
+	for rows.Next() {
+		var i Issue
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Title,
+			&i.Description,
+			&i.Status,
+			&i.Priority,
+			&i.CreatorID,
+			&i.AssigneeID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listIssuesForProjectByStatus = `-- name: ListIssuesForProjectByStatus :many
 SELECT id, project_id, title, description, status, priority, creator_id, assignee_id, created_at, updated_at
 FROM issues

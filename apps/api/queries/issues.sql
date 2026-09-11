@@ -32,6 +32,15 @@ FROM issues
 WHERE project_id = $1 AND status = $2 AND assignee_id = $3
 ORDER BY created_at DESC, id DESC;
 
+-- name: ListIssuesForProjectByFilters :many
+SELECT id, project_id, title, description, status, priority, creator_id, assignee_id, created_at, updated_at
+FROM issues
+WHERE project_id = $1
+  AND (sqlc.arg(status)::text = '' OR status = sqlc.arg(status))
+  AND (sqlc.narg(assignee_id)::uuid IS NULL OR assignee_id = sqlc.narg(assignee_id))
+  AND (sqlc.arg(priority)::text = '' OR priority = sqlc.arg(priority))
+ORDER BY created_at DESC, id DESC;
+
 -- name: UpdateIssue :one
 UPDATE issues
 SET title = $3,

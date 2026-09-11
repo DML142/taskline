@@ -47,19 +47,12 @@ func (r *PostgresRepository) Create(ctx context.Context, projectID, creatorID uu
 }
 
 func (r *PostgresRepository) List(ctx context.Context, projectID uuid.UUID, filter ListFilter) ([]Issue, error) {
-	queries := database.New(r.pool)
-	var rows []database.Issue
-	var err error
-	switch {
-	case filter.Status != "" && filter.AssigneeID != nil:
-		rows, err = queries.ListIssuesForProjectByStatusAndAssignee(ctx, database.ListIssuesForProjectByStatusAndAssigneeParams{ProjectID: projectID, Status: string(filter.Status), AssigneeID: nullableUUID(filter.AssigneeID)})
-	case filter.Status != "":
-		rows, err = queries.ListIssuesForProjectByStatus(ctx, database.ListIssuesForProjectByStatusParams{ProjectID: projectID, Status: string(filter.Status)})
-	case filter.AssigneeID != nil:
-		rows, err = queries.ListIssuesForProjectByAssignee(ctx, database.ListIssuesForProjectByAssigneeParams{ProjectID: projectID, AssigneeID: nullableUUID(filter.AssigneeID)})
-	default:
-		rows, err = queries.ListIssuesForProject(ctx, projectID)
-	}
+	rows, err := database.New(r.pool).ListIssuesForProjectByFilters(ctx, database.ListIssuesForProjectByFiltersParams{
+		ProjectID:  projectID,
+		Status:     string(filter.Status),
+		AssigneeID: nullableUUID(filter.AssigneeID),
+		Priority:   string(filter.Priority),
+	})
 	if err != nil {
 		return nil, err
 	}
