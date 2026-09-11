@@ -212,6 +212,12 @@ export default function ProjectPage() {
   const workspaceRole = workspace.role;
   const canManage = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
   const canCreateIssue = canManage || workspaceRole === "MEMBER";
+  const boardGridClass =
+    {
+      1: "md:grid-cols-1",
+      2: "md:grid-cols-2",
+      3: "md:grid-cols-3",
+    }[visibleStatuses.length] ?? "md:grid-cols-1";
   const assignableMembers = canManage
     ? members
     : members.filter((member) => member.userId === user?.id);
@@ -521,7 +527,10 @@ export default function ProjectPage() {
             </button>
           </form>
         )}
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <div
+          data-testid="kanban-board"
+          className={`mt-4 grid gap-4 ${boardGridClass}`}
+        >
           {boardColumns
             .filter((column) => visibleStatuses.includes(column.status))
             .map((column) => {

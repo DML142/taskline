@@ -239,6 +239,21 @@ describe("ProjectPage", () => {
     expect(getColumn("Done")).toBeTruthy();
   });
 
+  it("makes visible columns fill the available desktop width", async () => {
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    await screen.findByText("Ship the redesign");
+    const board = screen.getByTestId("kanban-board");
+    expect(board.className).toContain("md:grid-cols-3");
+
+    await user.click(screen.getByLabelText("Show Done"));
+    expect(board.className).toContain("md:grid-cols-2");
+
+    await user.click(screen.getByLabelText("Show In progress"));
+    expect(board.className).toContain("md:grid-cols-1");
+  });
+
   it("does not add a created issue that fails active filters", async () => {
     listResponder = () => new Response(JSON.stringify({ issues: [] }));
     createResponder = () =>
