@@ -73,6 +73,7 @@ export default function ProjectPage() {
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [issueTitle, setIssueTitle] = useState("");
   const [issueDescription, setIssueDescription] = useState("");
+  const [issueStatus, setIssueStatus] = useState<IssueStatus>("TODO");
   const [issuePriority, setIssuePriority] = useState<IssuePriority>("MEDIUM");
   const [issueAssignee, setIssueAssignee] = useState("");
   const [draggedIssueId, setDraggedIssueId] = useState<string | null>(null);
@@ -174,7 +175,7 @@ export default function ProjectPage() {
       const created = await issueApi.create(workspace.id, project.slug, {
         title: issueTitle,
         description: issueDescription,
-        status: "TODO",
+        status: issueStatus,
         priority: issuePriority,
         assigneeId: issueAssignee || null,
       });
@@ -185,6 +186,7 @@ export default function ProjectPage() {
       );
       setIssueTitle("");
       setIssueDescription("");
+      setIssueStatus("TODO");
       setIssuePriority("MEDIUM");
       setIssueAssignee("");
     } catch (caught) {
@@ -489,6 +491,22 @@ export default function ProjectPage() {
               />
             </label>
             <div className="flex flex-wrap gap-3">
+              <label className="grid gap-1 text-sm font-medium">
+                Issue status
+                <select
+                  value={issueStatus}
+                  onChange={(event) =>
+                    setIssueStatus(event.target.value as IssueStatus)
+                  }
+                  className="rounded-md border bg-background px-3 py-2 text-sm font-normal"
+                >
+                  {boardColumns.map((column) => (
+                    <option key={column.status} value={column.status}>
+                      {column.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="grid gap-1 text-sm font-medium">
                 Issue priority
                 <select

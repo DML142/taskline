@@ -421,6 +421,46 @@ describe("ProjectPage", () => {
     ).toBeTruthy();
   });
 
+  it("creates an issue in the selected Kanban status", async () => {
+    createResponder = (_url, init) => {
+      const inputBody = JSON.parse(String(init.body)) as {
+        title: string;
+        description: string;
+        status: TestIssue["status"];
+        priority: TestIssue["priority"];
+        assigneeId: string | null;
+      };
+      return new Response(
+        JSON.stringify({
+          issue: {
+            ...issue(
+              "issue-progress-created",
+              inputBody.title,
+              inputBody.status,
+              inputBody.priority,
+            ),
+            description: inputBody.description,
+            assigneeId: inputBody.assigneeId,
+          },
+        }),
+      );
+    };
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    await screen.findByText("Ship the redesign");
+    await user.type(screen.getByLabelText("Title"), "Start implementation");
+    await user.selectOptions(
+      screen.getByLabelText("Issue status"),
+      "IN_PROGRESS",
+    );
+    await user.click(screen.getByRole("button", { name: "Create issue" }));
+
+    expect(
+      await within(getColumn("In progress")).findByText("Start implementation"),
+    ).toBeTruthy();
+  });
+
   it("moves a permitted card optimistically and persists its complete input", async () => {
     render(<ProjectPage />);
 
