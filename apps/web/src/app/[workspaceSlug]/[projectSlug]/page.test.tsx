@@ -48,8 +48,7 @@ let updateResponder:
   ((url: string, init: RequestInit) => Response | Promise<Response>) | null;
 let listResponder: ((url: string) => Response | Promise<Response>) | null;
 let createResponder:
-  | ((url: string, init: RequestInit) => Response | Promise<Response>)
-  | null;
+  ((url: string, init: RequestInit) => Response | Promise<Response>) | null;
 
 const protectedRequest = vi.fn(
   async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -229,7 +228,11 @@ describe("ProjectPage", () => {
     await screen.findByText("Ship the redesign");
     await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
     await waitFor(() =>
-      expect(within(screen.getByLabelText("In progress")).queryByText("Review the copy")).toBeNull(),
+      expect(
+        within(screen.getByLabelText("In progress")).queryByText(
+          "Review the copy",
+        ),
+      ).toBeNull(),
     );
 
     const card = screen.getByText("Ship the redesign");
@@ -238,7 +241,9 @@ describe("ProjectPage", () => {
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
 
-    await waitFor(() => expect(screen.queryByText("Ship the redesign")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByText("Ship the redesign")).toBeNull(),
+    );
   });
 
   it("restores a rejected move only when the original card matches active filters", async () => {
@@ -257,7 +262,11 @@ describe("ProjectPage", () => {
     await screen.findByText("Ship the redesign");
     await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
     await waitFor(() =>
-      expect(within(screen.getByLabelText("In progress")).queryByText("Review the copy")).toBeNull(),
+      expect(
+        within(screen.getByLabelText("In progress")).queryByText(
+          "Review the copy",
+        ),
+      ).toBeNull(),
     );
 
     const card = screen.getByText("Ship the redesign");
@@ -290,11 +299,71 @@ describe("ProjectPage", () => {
     await screen.findByRole("heading", { name: "To do" });
     await user.selectOptions(screen.getByLabelText("Filter status"), "TODO");
     await user.selectOptions(screen.getByLabelText("Priority"), "HIGH");
-    await user.selectOptions(screen.getAllByLabelText("Assignee")[0], "owner-1");
+    await user.selectOptions(
+      screen.getAllByLabelText("Assignee")[0],
+      "owner-1",
+    );
     await user.type(screen.getByLabelText("Title"), "Hidden issue");
     await user.click(screen.getByRole("button", { name: "Create issue" }));
 
     expect(screen.queryByText("Hidden issue")).toBeNull();
+  });
+
+  it("uses filters selected while a create request is pending", async () => {
+    let resolveCreate: (response: Response) => void = () => undefined;
+    listResponder = () => new Response(JSON.stringify({ issues: [] }));
+    createResponder = () =>
+      new Promise<Response>((resolve) => {
+        resolveCreate = resolve;
+      });
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    await screen.findByRole("heading", { name: "To do" });
+    await user.type(screen.getByLabelText("Title"), "Late create");
+    await user.click(screen.getByRole("button", { name: "Create issue" }));
+    await user.selectOptions(screen.getByLabelText("Priority"), "HIGH");
+
+    resolveCreate(
+      new Response(
+        JSON.stringify({
+          issue: issue("issue-created", "Late create", "TODO", "LOW"),
+        }),
+      ),
+    );
+
+    await waitFor(() => expect(screen.queryByText("Late create")).toBeNull());
+  });
+
+  it("uses filters selected while a move request is pending", async () => {
+    let resolveUpdate: (response: Response) => void = () => undefined;
+    updateResponder = () =>
+      new Promise<Response>((resolve) => {
+        resolveUpdate = resolve;
+      });
+    listResponder = () =>
+      new Response(JSON.stringify({ issues: responseIssues }));
+    const user = userEvent.setup();
+    render(<ProjectPage />);
+
+    const card = await screen.findByText("Ship the redesign");
+    const inProgress = screen.getByLabelText("In progress");
+    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
+    await user.selectOptions(screen.getByLabelText("Priority"), "LOW");
+
+    resolveUpdate(
+      new Response(
+        JSON.stringify({
+          issue: { ...responseIssues[0], status: "IN_PROGRESS" },
+        }),
+      ),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("Ship the redesign")).toBeNull(),
+    );
   });
 
   it("ignores a stale list response that resolves after a confirmed move", async () => {
@@ -317,11 +386,15 @@ describe("ProjectPage", () => {
     fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
     fireEvent.dragOver(inProgress, { dataTransfer: { setData: vi.fn() } });
     fireEvent.drop(inProgress, { dataTransfer: { setData: vi.fn() } });
-    expect(await within(inProgress).findByText("Ship the redesign")).toBeTruthy();
+    expect(
+      await within(inProgress).findByText("Ship the redesign"),
+    ).toBeTruthy();
 
     resolveStaleList(new Response(JSON.stringify({ issues: responseIssues })));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(within(screen.getByLabelText("To do")).queryByText("Ship the redesign")).toBeNull();
+    expect(
+      within(screen.getByLabelText("To do")).queryByText("Ship the redesign"),
+    ).toBeNull();
     expect(within(inProgress).getByText("Ship the redesign")).toBeTruthy();
   });
 
@@ -335,7 +408,9 @@ describe("ProjectPage", () => {
     fireEvent.dragOver(target, { dataTransfer });
     expect(target.className).toContain("border-primary");
 
-    const heading = within(target).getByRole("heading", { name: "In progress" });
+    const heading = within(target).getByRole("heading", {
+      name: "In progress",
+    });
     fireEvent.dragLeave(heading, { relatedTarget: heading });
     expect(target.className).toContain("border-primary");
     fireEvent.dragLeave(target, { relatedTarget: document.body });

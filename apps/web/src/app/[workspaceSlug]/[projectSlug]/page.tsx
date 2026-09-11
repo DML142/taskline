@@ -24,6 +24,20 @@ const boardColumns: ReadonlyArray<{ status: IssueStatus; title: string }> = [
   { status: "DONE", title: "Done" },
 ];
 
+type IssueFilters = {
+  status: "" | IssueStatus;
+  priority: "" | IssuePriority;
+  assigneeId: string;
+};
+
+function matchesIssueFilters(issue: Issue, filters: IssueFilters) {
+  return (
+    (!filters.status || issue.status === filters.status) &&
+    (!filters.priority || issue.priority === filters.priority) &&
+    (!filters.assigneeId || issue.assigneeId === filters.assigneeId)
+  );
+}
+
 export default function ProjectPage() {
   const { workspaceSlug, projectSlug } = useParams<{
     workspaceSlug: string;
@@ -69,6 +83,16 @@ export default function ProjectPage() {
     () => new Set(),
   );
   const listRequestGeneration = useRef(0);
+  const filtersRef = useRef<IssueFilters>({
+    status: statusFilter,
+    priority: priorityFilter,
+    assigneeId: assigneeFilter,
+  });
+  filtersRef.current = {
+    status: statusFilter,
+    priority: priorityFilter,
+    assigneeId: assigneeFilter,
+  };
 
   useEffect(() => {
     workspaceApi
@@ -215,11 +239,7 @@ export default function ProjectPage() {
   }
 
   function matchesCurrentFilters(issue: Issue) {
-    return (
-      (!statusFilter || issue.status === statusFilter) &&
-      (!priorityFilter || issue.priority === priorityFilter) &&
-      (!assigneeFilter || issue.assigneeId === assigneeFilter)
-    );
+    return matchesIssueFilters(issue, filtersRef.current);
   }
 
   function replaceFilteredIssue(current: Issue[], nextIssue: Issue) {
@@ -259,10 +279,9 @@ export default function ProjectPage() {
     status: IssueStatus,
   ) {
     if (event.currentTarget !== event.target) return;
-    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-    setActiveDropStatus((current) =>
-      current === status ? null : current,
-    );
+    if (event.currentTarget.contains(event.relatedTarget as Node | null))
+      return;
+    setActiveDropStatus((current) => (current === status ? null : current));
   }
 
   async function handleDrop(
