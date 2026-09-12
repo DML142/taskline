@@ -11,6 +11,10 @@ The repository includes email/password authentication, session rotation, workspa
 - PostgreSQL 18 through Docker Compose
 - Go modules for the API; pnpm workspace for `apps/web`
 
+## Git workflow
+
+Branch names must not contain `codex`.
+
 ## Local development
 
 Requirements: Go 1.27.1 (or automatic Go toolchain downloads enabled), Node.js 22.12+ and pnpm 11.20.0, Docker with Compose.
