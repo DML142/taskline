@@ -26,5 +26,8 @@ describe("Home", () => {
     })) {
       expect(link.getAttribute("href")).toBe("/register");
     }
+    expect(
+      screen.getByRole("link", { name: "Learn more" }).getAttribute("href"),
+    ).toBe("/about");
   });
 });
