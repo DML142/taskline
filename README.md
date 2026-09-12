@@ -116,6 +116,15 @@ GET   /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}
 PATCH /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}
 ```
 
+Issues also have chronological comments. Every workspace member can read them; owners, admins, and members can add comments. Only a comment's author can edit or delete it, including when the author is an owner or administrator. Viewers cannot create, edit, or delete comments.
+
+```text
+GET    /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments
+POST   /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments
+PATCH  /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments/{commentUUID}
+DELETE /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments/{commentUUID}
+```
+
 ## Checks
 
 From `apps/api`:

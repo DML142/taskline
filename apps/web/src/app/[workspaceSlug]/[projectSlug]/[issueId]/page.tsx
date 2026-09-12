@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/auth-context";
+import { CommentApi, type IssueComment } from "@/lib/comment-api";
 import {
   IssueApi,
   type Issue,
@@ -37,9 +38,14 @@ export default function IssuePage() {
     () => new IssueApi(baseURL, protectedRequest),
     [baseURL, protectedRequest],
   );
+  const commentApi = useMemo(
+    () => new CommentApi(baseURL, protectedRequest),
+    [baseURL, protectedRequest],
+  );
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [issue, setIssue] = useState<Issue | null>(null);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [comments, setComments] = useState<IssueComment[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<IssueStatus>("TODO");
@@ -47,6 +53,10 @@ export default function IssuePage() {
   const [assigneeId, setAssigneeId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentPending, setCommentPending] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState("");
 
   useEffect(() => {
     workspaceApi
@@ -61,13 +71,20 @@ export default function IssuePage() {
           (item) => item.slug === projectSlug,
         );
         if (!selectedProject) throw new Error("Project not found");
-        const [loadedIssue, workspaceMembers] = await Promise.all([
-          issueApi.get(selectedWorkspace.id, selectedProject.slug, issueId),
-          workspaceApi.members(selectedWorkspace.id),
-        ]);
+        const [loadedIssue, workspaceMembers, loadedComments] =
+          await Promise.all([
+            issueApi.get(selectedWorkspace.id, selectedProject.slug, issueId),
+            workspaceApi.members(selectedWorkspace.id),
+            commentApi.list(
+              selectedWorkspace.id,
+              selectedProject.slug,
+              issueId,
+            ),
+          ]);
         setWorkspace(selectedWorkspace);
         setIssue(loadedIssue);
         setMembers(workspaceMembers);
+        setComments(loadedComments);
         setTitle(loadedIssue.title);
         setDescription(loadedIssue.description);
         setStatus(loadedIssue.status);
@@ -79,7 +96,15 @@ export default function IssuePage() {
           caught instanceof Error ? caught.message : "Unable to load issue.",
         ),
       );
-  }, [issueApi, issueId, projectApi, projectSlug, workspaceApi, workspaceSlug]);
+  }, [
+    commentApi,
+    issueApi,
+    issueId,
+    projectApi,
+    projectSlug,
+    workspaceApi,
+    workspaceSlug,
+  ]);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,6 +131,79 @@ export default function IssuePage() {
       );
     } finally {
       setPending(false);
+    }
+  }
+
+  async function addComment(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!workspace || !issue || !commentBody.trim()) return;
+    setCommentPending(true);
+    setError(null);
+    try {
+      const comment = await commentApi.create(
+        workspace.id,
+        projectSlug,
+        issue.id,
+        {
+          body: commentBody,
+        },
+      );
+      setComments((current) => [...current, comment]);
+      setCommentBody("");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to add comment.",
+      );
+    } finally {
+      setCommentPending(false);
+    }
+  }
+
+  async function saveComment(commentId: string) {
+    if (!workspace || !issue || !editingCommentBody.trim()) return;
+    setCommentPending(true);
+    setError(null);
+    try {
+      const updated = await commentApi.update(
+        workspace.id,
+        projectSlug,
+        issue.id,
+        commentId,
+        {
+          body: editingCommentBody,
+        },
+      );
+      setComments((current) =>
+        current.map((comment) =>
+          comment.id === commentId ? updated : comment,
+        ),
+      );
+      setEditingCommentId(null);
+      setEditingCommentBody("");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to save comment.",
+      );
+    } finally {
+      setCommentPending(false);
+    }
+  }
+
+  async function deleteComment(commentId: string) {
+    if (!workspace || !issue || !window.confirm("Delete this comment?")) return;
+    setCommentPending(true);
+    setError(null);
+    try {
+      await commentApi.delete(workspace.id, projectSlug, issue.id, commentId);
+      setComments((current) =>
+        current.filter((comment) => comment.id !== commentId),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to delete comment.",
+      );
+    } finally {
+      setCommentPending(false);
     }
   }
 
@@ -244,6 +342,127 @@ export default function IssuePage() {
           </dl>
         </section>
       )}
+      <section
+        className="mt-8 grid gap-4 border-t pt-6"
+        aria-labelledby="comments-heading"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="comments-heading" className="text-lg font-semibold">
+            Comments
+          </h2>
+          <span className="text-sm text-muted-foreground">
+            {comments.length}
+          </span>
+        </div>
+        {comments.length ? (
+          <ol className="grid gap-4">
+            {comments.map((comment) => {
+              const isAuthor = comment.authorId === user?.id;
+              const isEditing = editingCommentId === comment.id;
+              return (
+                <li
+                  key={comment.id}
+                  className="grid gap-2 border-b pb-4 text-sm last:border-0"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <p className="font-medium">
+                      {isAuthor ? "You" : comment.authorName}
+                    </p>
+                    <time
+                      className="text-xs text-muted-foreground"
+                      dateTime={comment.createdAt}
+                    >
+                      {new Date(comment.createdAt).toLocaleString()}
+                    </time>
+                  </div>
+                  {isEditing ? (
+                    <>
+                      <textarea
+                        aria-label="Edit comment"
+                        maxLength={10000}
+                        value={editingCommentBody}
+                        onChange={(event) =>
+                          setEditingCommentBody(event.target.value)
+                        }
+                        className="min-h-20 rounded-md border bg-background px-3 py-2"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={
+                            commentPending || !editingCommentBody.trim()
+                          }
+                          onClick={() => saveComment(comment.id)}
+                          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                        >
+                          Save comment
+                        </button>
+                        <button
+                          type="button"
+                          disabled={commentPending}
+                          onClick={() => setEditingCommentId(null)}
+                          className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="whitespace-pre-wrap text-muted-foreground">
+                      {comment.body}
+                    </p>
+                  )}
+                  {isAuthor && !isEditing && (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        disabled={commentPending}
+                        onClick={() => {
+                          setEditingCommentId(comment.id);
+                          setEditingCommentBody(comment.body);
+                        }}
+                        className="text-sm underline disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={commentPending}
+                        onClick={() => deleteComment(comment.id)}
+                        className="text-sm text-destructive underline disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <p className="text-sm text-muted-foreground">No comments yet.</p>
+        )}
+        {workspace.role !== "VIEWER" && (
+          <form onSubmit={addComment} className="grid gap-2">
+            <label className="grid gap-1 text-sm font-medium">
+              Add a comment
+              <textarea
+                required
+                maxLength={10000}
+                value={commentBody}
+                onChange={(event) => setCommentBody(event.target.value)}
+                className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm font-normal"
+              />
+            </label>
+            <button
+              disabled={commentPending || !commentBody.trim()}
+              className="w-fit rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {commentPending ? "Saving…" : "Add comment"}
+            </button>
+          </form>
+        )}
+      </section>
     </main>
   );
 }

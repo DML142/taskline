@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"taskline/apps/api/internal/auth"
+	"taskline/apps/api/internal/comment"
 	"taskline/apps/api/internal/invite"
 	"taskline/apps/api/internal/issue"
 	"taskline/apps/api/internal/platform/config"
@@ -48,9 +49,10 @@ func run(logger *slog.Logger) error {
 	invites := invite.NewHandler(invite.NewService(invite.NewRepository(pool), workspaceService, invite.NewSMTPMailer(cfg.SMTP), cfg.Auth.WebOrigin, time.Now), authService)
 	projects := project.NewHandler(project.NewService(project.NewRepository(pool)), authService)
 	issues := issue.NewHandler(issue.NewService(issue.NewRepository(pool)), authService)
+	comments := comment.NewHandler(comment.NewService(comment.NewRepository(pool)), authService)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces, projects, issues, invites),
+		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces, projects, issues, invites, comments),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

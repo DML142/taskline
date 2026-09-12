@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -83,8 +84,11 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 		r.Mount("/api/v1/projects/", projectRoutes)
 	}
 	if len(workspaces) > 2 && workspaces[2] != nil {
-		issueRoutes := http.StripPrefix("/api/v1/issues", workspaces[2])
-		r.Mount("/api/v1/issues/", issueRoutes)
+		var issueRoutes http.Handler = workspaces[2]
+		if len(workspaces) > 4 && workspaces[4] != nil {
+			issueRoutes = issueAndCommentRoutes{issues: workspaces[2], comments: workspaces[4]}
+		}
+		r.Mount("/api/v1/issues/", http.StripPrefix("/api/v1/issues", issueRoutes))
 	}
 	if len(workspaces) > 3 && workspaces[3] != nil {
 		inviteRoutes := http.StripPrefix("/api/v1/workspace-invites", workspaces[3])
@@ -98,4 +102,18 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 		writeError(logger, w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed")
 	})
 	return r
+}
+
+type issueAndCommentRoutes struct {
+	issues   http.Handler
+	comments http.Handler
+}
+
+func (h issueAndCommentRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	segments := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(segments) >= 4 && segments[3] == "comments" {
+		h.comments.ServeHTTP(w, r)
+		return
+	}
+	h.issues.ServeHTTP(w, r)
 }

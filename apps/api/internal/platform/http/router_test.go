@@ -110,3 +110,21 @@ func TestRouterMountsIssueRoutesBelowAPIPrefix(t *testing.T) {
 
 	require.Equal(t, http.StatusNoContent, response.Code)
 }
+
+func TestRouterCombinesIssueAndCommentRoutes(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	issues := http.NewServeMux()
+	issues.HandleFunc("GET /workspace/project/issue", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	comments := http.NewServeMux()
+	comments.HandleFunc("GET /workspace/project/issue/comments", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+
+	router := NewRouter(logger, fakePinger{}, nil, nil, nil, issues, nil, comments)
+
+	issueResponse := httptest.NewRecorder()
+	router.ServeHTTP(issueResponse, httptest.NewRequest(http.MethodGet, "/api/v1/issues/workspace/project/issue", nil))
+	commentResponse := httptest.NewRecorder()
+	router.ServeHTTP(commentResponse, httptest.NewRequest(http.MethodGet, "/api/v1/issues/workspace/project/issue/comments", nil))
+
+	require.Equal(t, http.StatusNoContent, issueResponse.Code)
+	require.Equal(t, http.StatusAccepted, commentResponse.Code)
+}
