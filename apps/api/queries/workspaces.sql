@@ -35,7 +35,7 @@ WHERE wm.workspace_id = $1
 ORDER BY wm.created_at, u.id;
 
 -- name: FindWorkspaceUserByEmail :one
-SELECT id, email, name, password_hash, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, email_verified_at
 FROM users
 WHERE email = $1;
 

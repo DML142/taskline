@@ -13,6 +13,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createEmailVerificationToken = `-- name: CreateEmailVerificationToken :one
+INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+VALUES ($1, $2, $3)
+RETURNING id, user_id, token_hash, expires_at, used_at, created_at
+`
+
+type CreateEmailVerificationTokenParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt time.Time
+}
+
+func (q *Queries) CreateEmailVerificationToken(ctx context.Context, arg CreateEmailVerificationTokenParams) (EmailVerificationToken, error) {
+	row := q.db.QueryRow(ctx, createEmailVerificationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	var i EmailVerificationToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createSession = `-- name: CreateSession :one
 INSERT INTO sessions (id, user_id, family_id, token_hash, expires_at)
 VALUES ($1, $2, $3, $4, $5)
@@ -52,7 +78,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, name, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, password_hash, created_at, updated_at
+RETURNING id, email, name, password_hash, created_at, updated_at, email_verified_at
 `
 
 type CreateUserParams struct {
@@ -71,6 +97,38 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerifiedAt,
+	)
+	return i, err
+}
+
+const deleteOpenEmailVerificationTokens = `-- name: DeleteOpenEmailVerificationTokens :exec
+DELETE FROM email_verification_tokens
+WHERE user_id = $1 AND used_at IS NULL
+`
+
+func (q *Queries) DeleteOpenEmailVerificationTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOpenEmailVerificationTokens, userID)
+	return err
+}
+
+const getEmailVerificationTokenByHashForUpdate = `-- name: GetEmailVerificationTokenByHashForUpdate :one
+SELECT id, user_id, token_hash, expires_at, used_at, created_at
+FROM email_verification_tokens
+WHERE token_hash = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetEmailVerificationTokenByHashForUpdate(ctx context.Context, tokenHash []byte) (EmailVerificationToken, error) {
+	row := q.db.QueryRow(ctx, getEmailVerificationTokenByHashForUpdate, tokenHash)
+	var i EmailVerificationToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -99,7 +157,7 @@ func (q *Queries) GetSessionByTokenHashForUpdate(ctx context.Context, tokenHash 
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, name, password_hash, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, email_verified_at
 FROM users
 WHERE email = $1
 `
@@ -114,12 +172,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, name, password_hash, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, email_verified_at
 FROM users
 WHERE id = $1
 `
@@ -134,12 +193,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }
 
 const getUserForSession = `-- name: GetUserForSession :one
-SELECT u.id, u.email, u.name, u.password_hash, u.created_at, u.updated_at
+SELECT u.id, u.email, u.name, u.password_hash, u.created_at, u.updated_at, u.email_verified_at
 FROM users AS u
 JOIN sessions AS s ON s.user_id = u.id
 WHERE s.id = $1
@@ -155,6 +215,7 @@ func (q *Queries) GetUserForSession(ctx context.Context, id uuid.UUID) (User, er
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }
@@ -162,7 +223,8 @@ func (q *Queries) GetUserForSession(ctx context.Context, id uuid.UUID) (User, er
 const hasActiveSession = `-- name: HasActiveSession :one
 SELECT EXISTS (
     SELECT 1 FROM sessions
-    WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()
+    JOIN users ON users.id = sessions.user_id
+    WHERE sessions.id = $1 AND sessions.user_id = $2 AND sessions.revoked_at IS NULL AND sessions.expires_at > now() AND users.email_verified_at IS NOT NULL
 )
 `
 
@@ -214,4 +276,32 @@ WHERE family_id = $1 AND revoked_at IS NULL
 func (q *Queries) RevokeSessionFamily(ctx context.Context, familyID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, revokeSessionFamily, familyID)
 	return err
+}
+
+const useEmailVerificationToken = `-- name: UseEmailVerificationToken :execrows
+UPDATE email_verification_tokens
+SET used_at = now()
+WHERE id = $1 AND used_at IS NULL
+`
+
+func (q *Queries) UseEmailVerificationToken(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, useEmailVerificationToken, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const verifyUserEmail = `-- name: VerifyUserEmail :execrows
+UPDATE users
+SET email_verified_at = now()
+WHERE id = $1 AND email_verified_at IS NULL
+`
+
+func (q *Queries) VerifyUserEmail(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, verifyUserEmail, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

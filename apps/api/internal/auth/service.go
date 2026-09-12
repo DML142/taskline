@@ -10,14 +10,17 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"taskline/apps/api/internal/mailer"
 	database "taskline/apps/api/internal/platform/database/sqlc"
 )
 
 const refreshSessionLifetime = 30 * 24 * time.Hour
 
 var (
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUnauthenticated    = errors.New("unauthenticated")
+	ErrInvalidCredentials        = errors.New("invalid credentials")
+	ErrUnauthenticated           = errors.New("unauthenticated")
+	ErrVerificationUnavailable   = errors.New("verification unavailable")
+	ErrEmailVerificationRequired = errors.New("email verification required")
 )
 
 type RegisterInput struct{ Name, Email, Password string }
@@ -30,10 +33,27 @@ type Service struct {
 	repository *Repository
 	tokens     *TokenManager
 	now        func() time.Time
+	mailer     mailer.Mailer
+	webOrigin  string
 }
 
-func NewService(repository *Repository, tokens *TokenManager, now func() time.Time) *Service {
-	return &Service{repository: repository, tokens: tokens, now: now}
+type ServiceOption func(*Service)
+
+func WithEmailVerification(delivery mailer.Mailer, webOrigin string) ServiceOption {
+	return func(s *Service) {
+		if delivery != nil {
+			s.mailer = delivery
+		}
+		s.webOrigin = strings.TrimRight(webOrigin, "/")
+	}
+}
+
+func NewService(repository *Repository, tokens *TokenManager, now func() time.Time, options ...ServiceOption) *Service {
+	s := &Service{repository: repository, tokens: tokens, now: now, mailer: noopMailer{}}
+	for _, option := range options {
+		option(s)
+	}
+	return s
 }
 
 func (s *Service) Register(ctx context.Context, input RegisterInput) (Authentication, error) {
@@ -41,19 +61,36 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (Authentica
 	if err != nil {
 		return Authentication{}, err
 	}
-	return s.repository.withTx(ctx, func(q *database.Queries) (Authentication, error) {
+	var secret string
+	result, err := s.repository.withTx(ctx, func(q *database.Queries) (Authentication, error) {
 		user, err := q.CreateUser(ctx, database.CreateUserParams{Email: strings.ToLower(strings.TrimSpace(input.Email)), Name: strings.TrimSpace(input.Name), PasswordHash: hash})
 		if err != nil {
 			return Authentication{}, err
 		}
-		return s.newAuthentication(ctx, q, storedUser(user), uuid.New())
+		secret, err = NewEmailVerificationToken()
+		if err != nil {
+			return Authentication{}, err
+		}
+		tokenHash := HashEmailVerificationToken(secret)
+		if _, err := q.CreateEmailVerificationToken(ctx, database.CreateEmailVerificationTokenParams{UserID: user.ID, TokenHash: tokenHash[:], ExpiresAt: s.now().Add(24 * time.Hour)}); err != nil {
+			return Authentication{}, err
+		}
+		return Authentication{User: storedUser(user)}, nil
 	})
+	if err != nil {
+		return Authentication{}, err
+	}
+	_ = s.sendVerificationEmail(ctx, result.User.Email, secret)
+	return result, nil
 }
 
 func (s *Service) Login(ctx context.Context, input LoginInput) (Authentication, error) {
 	user, err := s.repository.FindUserByEmail(ctx, strings.ToLower(strings.TrimSpace(input.Email)))
 	if err != nil || ComparePassword(user.PasswordHash, input.Password) != nil {
 		return Authentication{}, ErrInvalidCredentials
+	}
+	if !user.EmailVerifiedAt.Valid {
+		return Authentication{}, ErrEmailVerificationRequired
 	}
 	return s.repository.withTx(ctx, func(q *database.Queries) (Authentication, error) {
 		return s.newAuthentication(ctx, q, user, uuid.New())
@@ -76,6 +113,9 @@ func (s *Service) Refresh(ctx context.Context, token string) (Authentication, er
 		}
 		user, err := q.GetUserForSession(ctx, session.ID)
 		if err != nil {
+			return Authentication{}, ErrUnauthenticated
+		}
+		if !user.EmailVerifiedAt.Valid {
 			return Authentication{}, ErrUnauthenticated
 		}
 		nextID := uuid.New()
@@ -106,6 +146,62 @@ func (s *Service) Refresh(ctx context.Context, token string) (Authentication, er
 	}
 	return authentication, nil
 }
+
+func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
+	if rawToken == "" {
+		return ErrVerificationUnavailable
+	}
+	_, err := s.repository.withTx(ctx, func(q *database.Queries) (Authentication, error) {
+		tokenHash := HashEmailVerificationToken(rawToken)
+		token, err := q.GetEmailVerificationTokenByHashForUpdate(ctx, tokenHash[:])
+		if err != nil || token.UsedAt.Valid || !token.ExpiresAt.After(s.now()) {
+			return Authentication{}, ErrVerificationUnavailable
+		}
+		count, err := q.VerifyUserEmail(ctx, token.UserID)
+		if err != nil || count != 1 {
+			return Authentication{}, ErrVerificationUnavailable
+		}
+		count, err = q.UseEmailVerificationToken(ctx, token.ID)
+		if err != nil || count != 1 {
+			return Authentication{}, ErrVerificationUnavailable
+		}
+		return Authentication{}, nil
+	})
+	return err
+}
+
+func (s *Service) ResendVerification(ctx context.Context, email string) error {
+	user, err := s.repository.FindUserByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
+	if err != nil || user.EmailVerifiedAt.Valid {
+		return nil
+	}
+	secret, err := NewEmailVerificationToken()
+	if err != nil {
+		return err
+	}
+	_, err = s.repository.withTx(ctx, func(q *database.Queries) (Authentication, error) {
+		if err := q.DeleteOpenEmailVerificationTokens(ctx, user.ID); err != nil {
+			return Authentication{}, err
+		}
+		tokenHash := HashEmailVerificationToken(secret)
+		if _, err := q.CreateEmailVerificationToken(ctx, database.CreateEmailVerificationTokenParams{UserID: user.ID, TokenHash: tokenHash[:], ExpiresAt: s.now().Add(24 * time.Hour)}); err != nil {
+			return Authentication{}, err
+		}
+		return Authentication{}, nil
+	})
+	if err != nil {
+		return err
+	}
+	return s.sendVerificationEmail(ctx, user.Email, secret)
+}
+
+func (s *Service) sendVerificationEmail(ctx context.Context, email, secret string) error {
+	return s.mailer.Send(ctx, mailer.Message{To: email, Subject: "Verify your Taskline email", Body: "Verify your email address: " + s.webOrigin + "/verify-email?token=" + secret})
+}
+
+type noopMailer struct{}
+
+func (noopMailer) Send(context.Context, mailer.Message) error { return nil }
 
 func (s *Service) CurrentUser(ctx context.Context, accessToken string) (StoredUser, error) {
 	identity, err := s.authenticate(ctx, accessToken)
@@ -148,7 +244,7 @@ func (r *Repository) withTx(ctx context.Context, fn func(*database.Queries) (Aut
 	if err != nil {
 		return Authentication{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	result, err := fn(database.New(tx))
 	if err != nil {
 		return Authentication{}, err

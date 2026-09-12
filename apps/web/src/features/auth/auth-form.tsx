@@ -15,6 +15,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       : "/app";
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
@@ -23,10 +24,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       const form = new FormData(event.currentTarget);
       const email = String(form.get("email") ?? "");
       const password = String(form.get("password") ?? "");
-      if (mode === "register")
+      if (mode === "register") {
         await register(String(form.get("name") ?? ""), email, password);
-      else await login(email, password);
-      router.replace(next);
+        router.replace(`/verify-email?email=${encodeURIComponent(email)}`);
+      } else {
+        await login(email, password);
+        router.replace(next);
+      }
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -67,14 +71,29 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         </label>
         <label className="block text-sm">
           Password
-          <input
-            required
-            minLength={12}
-            maxLength={128}
-            type="password"
-            name="password"
-            className="mt-1 w-full rounded border p-2"
-          />
+          <div className="mt-1 flex gap-2">
+            <input
+              required
+              minLength={8}
+              maxLength={32}
+              type={showPassword ? "text" : "password"}
+              name="password"
+              className="w-full rounded border p-2"
+            />
+            <button
+              type="button"
+              className="rounded border px-3"
+              onClick={() => setShowPassword((value) => !value)}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+          {mode === "register" && (
+            <span className="mt-1 block text-xs text-muted-foreground">
+              8–32 characters, including a letter and a digit; no four identical
+              characters in a row.
+            </span>
+          )}
         </label>
         {error && (
           <p role="alert" className="text-sm text-destructive">

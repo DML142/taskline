@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-
+	"taskline/apps/api/internal/mailer"
 	"taskline/apps/api/internal/workspace"
 )
 
@@ -24,19 +23,19 @@ var (
 type Service struct {
 	repository *Repository
 	workspaces *workspace.Service
-	mailer     Mailer
+	mailer     mailer.Mailer
 	now        func() time.Time
 	webOrigin  string
 }
 
-func NewService(repository *Repository, workspaces *workspace.Service, mailer Mailer, webOrigin string, now func() time.Time) *Service {
-	if mailer == nil {
-		mailer = disabledMailer{}
+func NewService(repository *Repository, workspaces *workspace.Service, delivery mailer.Mailer, webOrigin string, now func() time.Time) *Service {
+	if delivery == nil {
+		delivery = mailer.Disabled{}
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repository: repository, workspaces: workspaces, mailer: mailer, webOrigin: strings.TrimRight(webOrigin, "/"), now: now}
+	return &Service{repository: repository, workspaces: workspaces, mailer: delivery, webOrigin: strings.TrimRight(webOrigin, "/"), now: now}
 }
 
 func (s *Service) Create(ctx context.Context, actorID, workspaceID uuid.UUID, email string, role workspace.Role) (Invite, error) {
@@ -59,7 +58,7 @@ func (s *Service) Create(ctx context.Context, actorID, workspaceID uuid.UUID, em
 	if err != nil {
 		return Invite{}, err
 	}
-	if err := s.mailer.Send(ctx, Message{To: invite.Email, WorkspaceName: current.Name, AcceptanceURL: s.webOrigin + "/invites/" + secret}); err != nil {
+	if err := s.mailer.Send(ctx, mailer.Message{To: invite.Email, Subject: "Invitation to " + current.Name, Body: "Accept this workspace invitation: " + s.webOrigin + "/invites/" + secret}); err != nil {
 		_, _ = s.repository.Revoke(ctx, workspaceID, invite.ID, nil)
 		return Invite{}, fmt.Errorf("%w: %v", ErrDeliveryFailed, err)
 	}
@@ -121,8 +120,4 @@ func (s *Service) Revoke(ctx context.Context, actorID, workspaceID, inviteID uui
 		return ErrUnavailable
 	}
 	return nil
-}
-
-func unavailable(err error) bool {
-	return errors.Is(err, ErrUnavailable) || errors.Is(err, pgx.ErrNoRows)
 }

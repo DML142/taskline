@@ -15,6 +15,7 @@ import (
 	"taskline/apps/api/internal/comment"
 	"taskline/apps/api/internal/invite"
 	"taskline/apps/api/internal/issue"
+	"taskline/apps/api/internal/mailer"
 	"taskline/apps/api/internal/platform/config"
 	"taskline/apps/api/internal/platform/database"
 	httpserver "taskline/apps/api/internal/platform/http"
@@ -42,11 +43,12 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("create database pool: %w", err)
 	}
 	defer pool.Close()
-	authService := auth.NewService(auth.NewRepository(pool), auth.NewTokenManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.JWTAudience, time.Now), time.Now)
+	smtpMailer := mailer.NewSMTPMailer(mailer.SMTPConfig{Host: cfg.SMTP.Host, Port: cfg.SMTP.Port, Username: cfg.SMTP.Username, Password: cfg.SMTP.Password, From: cfg.SMTP.From, TLSMode: cfg.SMTP.TLSMode})
+	authService := auth.NewService(auth.NewRepository(pool), auth.NewTokenManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.JWTAudience, time.Now), time.Now, auth.WithEmailVerification(smtpMailer, cfg.Auth.WebOrigin))
 	authentication := auth.NewHandler(logger, authService, cfg.Auth)
 	workspaces := workspace.NewHandler(workspace.NewService(workspace.NewRepository(pool)), authService)
 	workspaceService := workspace.NewService(workspace.NewRepository(pool))
-	invites := invite.NewHandler(invite.NewService(invite.NewRepository(pool), workspaceService, invite.NewSMTPMailer(cfg.SMTP), cfg.Auth.WebOrigin, time.Now), authService)
+	invites := invite.NewHandler(invite.NewService(invite.NewRepository(pool), workspaceService, smtpMailer, cfg.Auth.WebOrigin, time.Now), authService)
 	projects := project.NewHandler(project.NewService(project.NewRepository(pool)), authService)
 	issues := issue.NewHandler(issue.NewService(issue.NewRepository(pool)), authService)
 	comments := comment.NewHandler(comment.NewService(comment.NewRepository(pool)), authService)

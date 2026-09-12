@@ -26,7 +26,7 @@ func TestServiceRejectsDemotingOrRemovingAnOwner(t *testing.T) {
 	require.NoError(t, err)
 
 	service := NewService(NewRepository(pool))
-	workspace, err := service.Create(ctx, owner.ID, "Platform")
+	workspace, err := service.Create(ctx, owner.ID, fmt.Sprintf("Platform %d", time.Now().UnixNano()))
 	require.NoError(t, err)
 
 	require.ErrorIs(t, service.ChangeMemberRole(ctx, owner.ID, workspace.ID, owner.ID, RoleAdmin), ErrInvalidRequest)

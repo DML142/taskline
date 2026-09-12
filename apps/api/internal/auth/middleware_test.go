@@ -13,11 +13,15 @@ import (
 
 func TestAuthenticateAddsIdentityForAnActiveSession(t *testing.T) {
 	service := newTestService(t)
-	authentication, err := service.Register(context.Background(), RegisterInput{
+	email := fmt.Sprintf("middleware-%d@example.com", time.Now().UnixNano())
+	registration, err := service.Register(context.Background(), RegisterInput{
 		Name:     "Middleware user",
-		Email:    fmt.Sprintf("middleware-%d@example.com", time.Now().UnixNano()),
+		Email:    email,
 		Password: validTestPassword,
 	})
+	require.NoError(t, err)
+	verifyTestUser(t, service, registration.User.ID)
+	authentication, err := service.Login(context.Background(), LoginInput{Email: email, Password: validTestPassword})
 	require.NoError(t, err)
 
 	next := service.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -97,8 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthentication(result);
       },
       async register(name, email, password) {
-        const result = await api.register(name, email, password);
-        setAuthentication(result);
+        await api.register(name, email, password);
       },
       async logout() {
         await api.logout();

@@ -116,7 +116,7 @@ func (q *Queries) DeleteWorkspaceMember(ctx context.Context, arg DeleteWorkspace
 }
 
 const findWorkspaceUserByEmail = `-- name: FindWorkspaceUserByEmail :one
-SELECT id, email, name, password_hash, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, email_verified_at
 FROM users
 WHERE email = $1
 `
@@ -131,6 +131,7 @@ func (q *Queries) FindWorkspaceUserByEmail(ctx context.Context, email string) (U
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }

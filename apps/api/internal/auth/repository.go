@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	database "taskline/apps/api/internal/platform/database/sqlc"
@@ -23,12 +24,13 @@ type CreateUserInput struct {
 }
 
 type StoredUser struct {
-	ID           uuid.UUID
-	Email        string
-	Name         string
-	PasswordHash string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              uuid.UUID
+	Email           string
+	Name            string
+	PasswordHash    string
+	EmailVerifiedAt pgtype.Timestamptz
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 func NewRepository(pool *pgxpool.Pool) *Repository {
@@ -70,11 +72,12 @@ func (r *Repository) HasActiveSession(ctx context.Context, sessionID, userID uui
 
 func storedUser(user database.User) StoredUser {
 	return StoredUser{
-		ID:           user.ID,
-		Email:        user.Email,
-		Name:         user.Name,
-		PasswordHash: user.PasswordHash,
-		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
+		ID:              user.ID,
+		Email:           user.Email,
+		Name:            user.Name,
+		PasswordHash:    user.PasswordHash,
+		EmailVerifiedAt: user.EmailVerifiedAt,
+		CreatedAt:       user.CreatedAt,
+		UpdatedAt:       user.UpdatedAt,
 	}
 }

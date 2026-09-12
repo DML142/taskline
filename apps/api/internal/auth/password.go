@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
@@ -53,7 +54,31 @@ func ComparePassword(encodedHash, password string) error {
 }
 
 func validPassword(password string) bool {
-	return utf8.ValidString(password) && utf8.RuneCountInString(password) >= 12 && utf8.RuneCountInString(password) <= 128
+	if !utf8.ValidString(password) || len(password) > 72 {
+		return false
+	}
+
+	length := utf8.RuneCountInString(password)
+	if length < 8 || length > 32 {
+		return false
+	}
+
+	hasLetter, hasDigit := false, false
+	var previous rune
+	runLength := 0
+	for _, char := range password {
+		hasLetter = hasLetter || unicode.IsLetter(char)
+		hasDigit = hasDigit || unicode.IsDigit(char)
+		if char == previous {
+			runLength++
+		} else {
+			previous, runLength = char, 1
+		}
+		if runLength >= 4 {
+			return false
+		}
+	}
+	return hasLetter && hasDigit
 }
 
 func parsePasswordHash(encodedHash string) ([]byte, []byte, error) {

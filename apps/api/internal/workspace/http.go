@@ -33,10 +33,6 @@ func NewHandler(service *Service, authentication *auth.Service) http.Handler {
 type workspaceRequest struct {
 	Name string `json:"name"`
 }
-type memberRequest struct {
-	Email string `json:"email"`
-	Role  Role   `json:"role"`
-}
 type roleRequest struct {
 	Role Role `json:"role"`
 }
@@ -116,23 +112,6 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"members": members})
-}
-
-func (h *Handler) addMember(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := pathUUID(w, r, "workspaceID")
-	if !ok {
-		return
-	}
-	var request memberRequest
-	if !decodeJSON(w, r, &request) {
-		return
-	}
-	member, err := h.service.AddMember(r.Context(), identity(r).UserID, workspaceID, request.Email, request.Role)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"member": member})
 }
 
 func (h *Handler) changeMemberRole(w http.ResponseWriter, r *http.Request) {
