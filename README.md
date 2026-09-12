@@ -11,12 +11,6 @@ The repository includes email/password authentication, session rotation, workspa
 - PostgreSQL 18 through Docker Compose
 - Go modules for the API; pnpm workspace for `apps/web`
 
-## Git workflow
-
-Branch names must not contain `codex`.
-
-Do not use `phase` in branch names, commit messages, pull-request titles or descriptions, local plan filenames, or project-facing copy. Name work by its specific outcome instead.
-
 ## Local development
 
 Requirements: Go 1.27.1 (or automatic Go toolchain downloads enabled), Node.js 22.12+ and pnpm 11.20.0, Docker with Compose.
