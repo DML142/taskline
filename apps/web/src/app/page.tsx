@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Layers } from "lucide-react";
+import { useAuth } from "@/features/auth/auth-context";
 
 export default function Home() {
+  const { user } = useAuth();
+
   return (
     <main className="min-h-dvh bg-[#fbfcfe] text-[#1f2933]">
       <header className="border-b border-[#d9e0e8] bg-white">
@@ -15,23 +20,40 @@ export default function Home() {
             </span>
             Taskline
           </Link>
-          <nav
-            aria-label="Account"
-            className="flex items-center gap-2 text-sm font-medium sm:gap-4"
-          >
-            <Link
-              href="/login"
-              className="rounded-sm px-1 py-1.5 whitespace-nowrap text-[#374151] hover:text-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-2"
+          {user ? (
+            <nav
+              aria-label="Account"
+              className="flex items-center gap-3 text-sm font-medium"
             >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-sm bg-[#287ab5] px-3 py-2 whitespace-nowrap text-white hover:bg-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-4"
+              <span className="hidden max-w-32 truncate text-[#52606d] sm:block">
+                {user.name}
+              </span>
+              <Link
+                href="/app"
+                className="rounded-sm bg-[#287ab5] px-3 py-2 whitespace-nowrap text-white hover:bg-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-4"
+              >
+                Open app
+              </Link>
+            </nav>
+          ) : (
+            <nav
+              aria-label="Account"
+              className="flex items-center gap-2 text-sm font-medium sm:gap-4"
             >
-              Create account
-            </Link>
-          </nav>
+              <Link
+                href="/login"
+                className="rounded-sm px-1 py-1.5 whitespace-nowrap text-[#374151] hover:text-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-2"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-sm bg-[#287ab5] px-3 py-2 whitespace-nowrap text-white hover:bg-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-4"
+              >
+                Create account
+              </Link>
+            </nav>
+          )}
         </div>
       </header>
 
@@ -46,10 +68,10 @@ export default function Home() {
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Link
-              href="/register"
+              href={user ? "/app" : "/register"}
               className="inline-flex items-center gap-2 rounded-sm bg-[#287ab5] px-5 py-3 text-sm font-semibold text-white hover:bg-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4"
             >
-              Create an account
+              {user ? "Continue to Taskline" : "Create an account"}
               <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
             <Link
