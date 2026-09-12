@@ -11,22 +11,6 @@ The repository includes email/password authentication, session rotation, workspa
 - PostgreSQL 18 through Docker Compose
 - Go modules for the API; pnpm workspace for `apps/web`
 
-## Git workflow
-
-Branch names must not contain `codex`.
-
-## Development workflow
-
-Before beginning work, create a focused plan in `docs/local/plans/` with a checklist of phases and steps. Update that plan before and after every phase, marking completed work with `[x]`, outstanding work with `[ ]`, and any intentional deviation from the plan.
-
-`docs/local/` is intentionally ignored by Git: roadmaps, design notes, and plans stay on the local machine and are never committed.
-
-Follow the plan during implementation. Routine development work does not require step-by-step approval. When a decision, permission, or external action genuinely needs confirmation, collect all currently known items in one concise request instead of interrupting the work repeatedly.
-
-After verification, commit each new feature as one focused feature commit. Corrections made after a feature commit are separate fix commits. Keep commit scope and granularity consistent across tasks: do not split a small change into many commits or combine unrelated work into one large commit.
-
-Use clear, human commit messages and pull requests. Keep pull-request descriptions brief and concrete: short bullets such as `added routes: GET /…` or `comments on the project route` are preferred over exhaustive implementation narration.
-
 ## Local development
 
 Requirements: Go 1.27.1 (or automatic Go toolchain downloads enabled), Node.js 22.12+ and pnpm 11.20.0, Docker with Compose.
@@ -85,7 +69,7 @@ Set `NEXT_PUBLIC_API_URL` only when the API is not at `http://localhost:8080/api
 
 ## Authentication
 
-`POST /api/v1/auth/register`, `/login`, `/refresh` and `/logout` manage short-lived access JWTs and rotated HttpOnly refresh sessions. `GET /api/v1/auth/me` requires a bearer access token. Password reset, email verification, OAuth and MFA are not part of this phase.
+`POST /api/v1/auth/register`, `/login`, `/refresh` and `/logout` manage short-lived access JWTs and rotated HttpOnly refresh sessions. `GET /api/v1/auth/me` requires a bearer access token. Password reset, email verification, OAuth and MFA are not included yet.
 
 After changing SQL queries or migrations, regenerate the checked-in database package from `apps/api` with the pinned sqlc tool:
 
@@ -95,7 +79,7 @@ go tool sqlc generate
 
 ## Workspaces
 
-Authenticated users can create and list their workspaces. Each creator is an `OWNER`; workspace members have one of `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` roles. Every member can read the workspace and its member list. In this phase, only owners can rename or delete a workspace, or add and remove members. Members must already have an account; invitations and ownership transfer are not implemented.
+Authenticated users can create and list their workspaces. Each creator is an `OWNER`; workspace members have one of `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` roles. Every member can read the workspace and its member list. Only owners can rename or delete a workspace, or add and remove members. Members must already have an account; invitations and ownership transfer are not implemented.
 
 Workspace routes are protected by bearer access tokens under `/api/v1/workspaces`. Apply migrations explicitly before using them:
 

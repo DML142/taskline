@@ -1,65 +1,88 @@
 "use client";
 
 import Link from "next/link";
-import { Layers, LayoutDashboard } from "lucide-react";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Layers } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-context";
-import { WorkspaceOverview } from "@/features/workspaces/workspace-overview";
 
 export default function Home() {
-  const { ready, user, logout } = useAuth();
-  const router = useRouter();
-  useEffect(() => {
-    if (ready && !user) router.replace("/login");
-  }, [ready, router, user]);
-  if (!ready || !user) {
-    return (
-      <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">
-        Checking your session…
-      </main>
-    );
-  }
+  const { user } = useAuth();
+
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[220px_1fr]">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-10 focus:rounded-md focus:bg-background focus:p-3 focus:ring-2"
-      >
-        Skip to content
-      </a>
-      <aside className="border-b bg-sidebar p-4 md:border-r md:border-b-0">
-        <Link
-          href="/"
-          className="flex w-fit items-center gap-2 rounded-sm text-base font-semibold focus-visible:outline-2 focus-visible:outline-offset-4"
-        >
-          <Layers aria-hidden="true" className="size-5" />
-          Taskline
-        </Link>
-        <nav aria-label="Main navigation" className="mt-6">
+    <main className="min-h-dvh bg-[#fbfcfe] text-[#1f2933]">
+      <header className="border-b border-[#d9e0e8] bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <Link
             href="/"
-            aria-current="page"
-            className="flex items-center gap-2 rounded-md bg-sidebar-accent px-3 py-2 text-sm font-medium focus-visible:outline-2"
+            className="flex shrink-0 items-center gap-3 text-lg font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4"
           >
-            <LayoutDashboard aria-hidden="true" className="size-4" />
-            Overview
+            <span className="grid size-8 place-items-center bg-[#287ab5] text-white">
+              <Layers aria-hidden="true" className="size-4" />
+            </span>
+            Taskline
           </Link>
-        </nav>
-      </aside>
-      <main id="main" tabIndex={-1} className="min-w-0">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
-          <h1 className="text-sm font-medium">Overview</h1>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline">{user.name}</Badge>
-            <button onClick={() => void logout()} className="text-sm underline">
-              Sign out
-            </button>
+          {user ? (
+            <nav
+              aria-label="Account"
+              className="flex items-center gap-3 text-sm font-medium"
+            >
+              <span className="hidden max-w-32 truncate text-[#52606d] sm:block">
+                {user.name}
+              </span>
+              <Link
+                href="/app"
+                className="rounded-sm bg-[#287ab5] px-3 py-2 whitespace-nowrap text-white hover:bg-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-4"
+              >
+                Open app
+              </Link>
+            </nav>
+          ) : (
+            <nav
+              aria-label="Account"
+              className="flex items-center gap-2 text-sm font-medium sm:gap-4"
+            >
+              <Link
+                href="/login"
+                className="rounded-sm px-1 py-1.5 whitespace-nowrap text-[#374151] hover:text-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-2"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-sm bg-[#287ab5] px-3 py-2 whitespace-nowrap text-white hover:bg-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4 sm:px-4"
+              >
+                Create account
+              </Link>
+            </nav>
+          )}
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-6xl px-6 pb-20 pt-24 sm:pb-28 sm:pt-32 lg:px-8">
+        <div className="max-w-3xl border-l-4 border-[#287ab5] pl-6 sm:pl-8">
+          <h1 className="text-5xl leading-[1.02] font-semibold tracking-[-0.045em] text-balance sm:text-6xl">
+            Make the next task clear.
+          </h1>
+          <p className="mt-7 max-w-2xl text-lg leading-8 text-[#52606d]">
+            Taskline is a focused home for the projects, issues, and decisions
+            that help a small team move work forward.
+          </p>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Link
+              href={user ? "/app" : "/register"}
+              className="inline-flex items-center gap-2 rounded-sm bg-[#287ab5] px-5 py-3 text-sm font-semibold text-white hover:bg-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4"
+            >
+              {user ? "Continue to Taskline" : "Create an account"}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+            <Link
+              href="/about"
+              className="rounded-sm border border-[#9cabb9] bg-white px-5 py-3 text-sm font-semibold text-[#243b53] hover:border-[#287ab5] hover:text-[#176da7] focus-visible:outline-2 focus-visible:outline-offset-4"
+            >
+              Learn more
+            </Link>
           </div>
-        </header>
-        <WorkspaceOverview />
-      </main>
-    </div>
+        </div>
+      </section>
+    </main>
   );
 }
