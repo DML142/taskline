@@ -15,6 +15,18 @@ The repository includes email/password authentication, session rotation, workspa
 
 Branch names must not contain `codex`.
 
+## Development workflow
+
+Before beginning work, create a focused plan in `docs/local/plans/` with a checklist of phases and steps. Update that plan before and after every phase, marking completed work with `[x]`, outstanding work with `[ ]`, and any intentional deviation from the plan.
+
+`docs/local/` is intentionally ignored by Git: roadmaps, design notes, and plans stay on the local machine and are never committed.
+
+Follow the plan during implementation. Routine development work does not require step-by-step approval. When a decision, permission, or external action genuinely needs confirmation, collect all currently known items in one concise request instead of interrupting the work repeatedly.
+
+After verification, commit each new feature as one focused feature commit. Corrections made after a feature commit are separate fix commits. Keep commit scope and granularity consistent across tasks: do not split a small change into many commits or combine unrelated work into one large commit.
+
+Use clear, human commit messages and pull requests. Keep pull-request descriptions brief and concrete: short bullets such as `added routes: GET /…` or `comments on the project route` are preferred over exhaustive implementation narration.
+
 ## Local development
 
 Requirements: Go 1.27.1 (or automatic Go toolchain downloads enabled), Node.js 22.12+ and pnpm 11.20.0, Docker with Compose.
