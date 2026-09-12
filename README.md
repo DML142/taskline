@@ -11,6 +11,10 @@ The repository includes email/password authentication, session rotation, workspa
 - PostgreSQL 18 through Docker Compose
 - Go modules for the API; pnpm workspace for `apps/web`
 
+## Git workflow
+
+Branch names must not contain `codex`.
+
 ## Local development
 
 Requirements: Go 1.27.1 (or automatic Go toolchain downloads enabled), Node.js 22.12+ and pnpm 11.20.0, Docker with Compose.
@@ -114,6 +118,15 @@ GET   /api/v1/issues/{workspaceUUID}/{projectSlug}?status=TODO&assigneeId={userU
 POST  /api/v1/issues/{workspaceUUID}/{projectSlug}
 GET   /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}
 PATCH /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}
+```
+
+Issues also have chronological comments. Every workspace member can read them; owners, admins, and members can add comments. Only a comment's author can edit or delete it, including when the author is an owner or administrator. Viewers cannot create, edit, or delete comments.
+
+```text
+GET    /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments
+POST   /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments
+PATCH  /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments/{commentUUID}
+DELETE /api/v1/issues/{workspaceUUID}/{projectSlug}/{issueUUID}/comments/{commentUUID}
 ```
 
 ## Checks

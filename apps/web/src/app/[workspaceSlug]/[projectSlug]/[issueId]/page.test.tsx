@@ -45,6 +45,22 @@ vi.mock("@/features/auth/auth-context", () => ({
             },
           }),
         );
+      if (url.endsWith("/issues/workspace-1/website/issue-1/comments"))
+        return new Response(
+          JSON.stringify({
+            comments: [
+              {
+                id: "comment-1",
+                issueId: "issue-1",
+                authorId: "owner-1",
+                authorName: "Ada",
+                body: "Ready for review.",
+                createdAt: "2026-09-11T10:00:00Z",
+                updatedAt: "2026-09-11T10:00:00Z",
+              },
+            ],
+          }),
+        );
       if (url.endsWith("/workspaces/workspace-1/members"))
         return new Response(JSON.stringify({ members: [] }));
       return new Response(null, { status: 404 });
@@ -60,5 +76,12 @@ describe("IssuePage", () => {
 
     expect(await screen.findByDisplayValue("Ship the redesign")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save issue" })).toBeTruthy();
+  });
+
+  it("shows the issue discussion and lets a member add a comment", async () => {
+    render(<IssuePage />);
+
+    expect(await screen.findByText("Ready for review.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add comment" })).toBeTruthy();
   });
 });

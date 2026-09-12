@@ -70,6 +70,15 @@ type Issue struct {
 	UpdatedAt   time.Time
 }
 
+type IssueComment struct {
+	ID        uuid.UUID
+	IssueID   uuid.UUID
+	AuthorID  uuid.UUID
+	Body      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Project struct {
 	ID          uuid.UUID
 	WorkspaceID uuid.UUID
