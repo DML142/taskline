@@ -3,6 +3,7 @@
 .agents/
 .superpowers/
 AGENTS.local.md
+/docs/local/
 .env
 .env.*
 !.env.example

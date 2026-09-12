@@ -35,7 +35,7 @@ export default function InvitePage() {
   async function accept() {
     try {
       await api.accept(token);
-      router.push("/");
+      router.push("/app");
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Invitation is unavailable.",

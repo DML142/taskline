@@ -128,7 +128,7 @@ export default function WorkspaceProjectsPage() {
   if (error)
     return (
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <Link href="/" className="text-sm underline">
+        <Link href="/app" className="text-sm underline">
           Back to workspaces
         </Link>
         <p role="alert" className="mt-6 text-sm text-destructive">
@@ -146,7 +146,7 @@ export default function WorkspaceProjectsPage() {
   const owner = workspace.role === "OWNER";
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <Link href="/" className="text-sm underline">
+      <Link href="/app" className="text-sm underline">
         Back to workspaces
       </Link>
       <h1 className="mt-6 text-2xl font-semibold">{workspace.name}</h1>
