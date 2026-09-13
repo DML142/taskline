@@ -146,7 +146,7 @@ func validSlug(slug string) bool {
 			previousHyphen = true
 			continue
 		}
-		if !((character >= 'a' && character <= 'z') || (character >= '0' && character <= '9')) {
+		if (character < 'a' || character > 'z') && (character < '0' || character > '9') {
 			return false
 		}
 		previousHyphen = false

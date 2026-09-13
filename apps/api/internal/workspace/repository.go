@@ -63,7 +63,7 @@ func (r *Repository) CreateWithOwner(ctx context.Context, ownerID uuid.UUID, nam
 	if err != nil {
 		return Workspace{}, fmt.Errorf("begin workspace transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	queries := database.New(tx)
 	workspace, err := queries.CreateWorkspace(ctx, database.CreateWorkspaceParams{Name: strings.TrimSpace(name), Slug: slugFromName(name)})
 	if err != nil {

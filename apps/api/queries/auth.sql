@@ -1,22 +1,23 @@
 -- name: CreateUser :one
 INSERT INTO users (email, name, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, password_hash, created_at, updated_at;
+RETURNING id, email, name, password_hash, created_at, updated_at, email_verified_at;
 
 -- name: GetUserByEmail :one
-SELECT id, email, name, password_hash, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, email_verified_at
 FROM users
 WHERE email = $1;
 
 -- name: GetUserByID :one
-SELECT id, email, name, password_hash, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, email_verified_at
 FROM users
 WHERE id = $1;
 
 -- name: HasActiveSession :one
 SELECT EXISTS (
     SELECT 1 FROM sessions
-    WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()
+    JOIN users ON users.id = sessions.user_id
+    WHERE sessions.id = $1 AND sessions.user_id = $2 AND sessions.revoked_at IS NULL AND sessions.expires_at > now() AND users.email_verified_at IS NOT NULL
 );
 
 -- name: CreateSession :one
@@ -46,7 +47,32 @@ SET revoked_at = now()
 WHERE token_hash = $1 AND revoked_at IS NULL;
 
 -- name: GetUserForSession :one
-SELECT u.id, u.email, u.name, u.password_hash, u.created_at, u.updated_at
+SELECT u.id, u.email, u.name, u.password_hash, u.created_at, u.updated_at, u.email_verified_at
 FROM users AS u
 JOIN sessions AS s ON s.user_id = u.id
 WHERE s.id = $1;
+
+-- name: DeleteOpenEmailVerificationTokens :exec
+DELETE FROM email_verification_tokens
+WHERE user_id = $1 AND used_at IS NULL;
+
+-- name: CreateEmailVerificationToken :one
+INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+VALUES ($1, $2, $3)
+RETURNING id, user_id, token_hash, expires_at, used_at, created_at;
+
+-- name: GetEmailVerificationTokenByHashForUpdate :one
+SELECT id, user_id, token_hash, expires_at, used_at, created_at
+FROM email_verification_tokens
+WHERE token_hash = $1
+FOR UPDATE;
+
+-- name: UseEmailVerificationToken :execrows
+UPDATE email_verification_tokens
+SET used_at = now()
+WHERE id = $1 AND used_at IS NULL;
+
+-- name: VerifyUserEmail :execrows
+UPDATE users
+SET email_verified_at = now()
+WHERE id = $1 AND email_verified_at IS NULL;

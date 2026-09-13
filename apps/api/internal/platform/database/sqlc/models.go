@@ -57,6 +57,15 @@ func (ns NullWorkspaceRole) Value() (driver.Value, error) {
 	return string(ns.WorkspaceRole), nil
 }
 
+type EmailVerificationToken struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt time.Time
+	UsedAt    pgtype.Timestamptz
+	CreatedAt time.Time
+}
+
 type Issue struct {
 	ID          uuid.UUID
 	ProjectID   uuid.UUID
@@ -102,12 +111,13 @@ type Session struct {
 }
 
 type User struct {
-	ID           uuid.UUID
-	Email        string
-	Name         string
-	PasswordHash string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              uuid.UUID
+	Email           string
+	Name            string
+	PasswordHash    string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	EmailVerifiedAt pgtype.Timestamptz
 }
 
 type Workspace struct {

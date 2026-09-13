@@ -53,7 +53,7 @@ func (r *Repository) Create(ctx context.Context, workspaceID, creatorID uuid.UUI
 	if err != nil {
 		return Invite{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	q := database.New(tx)
 	normalized := normalizeEmail(email)
 	if err := q.RevokeOpenWorkspaceInvitesForEmail(ctx, database.RevokeOpenWorkspaceInvitesForEmailParams{WorkspaceID: workspaceID, Email: normalized}); err != nil {
@@ -74,7 +74,7 @@ func (r *Repository) Accept(ctx context.Context, tokenHash [sha256.Size]byte, us
 	if err != nil {
 		return workspace.Membership{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	q := database.New(tx)
 	row, err := q.GetWorkspaceInviteByTokenHashForUpdate(ctx, tokenHash[:])
 	if errors.Is(err, pgx.ErrNoRows) {

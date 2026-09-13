@@ -84,7 +84,7 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 		r.Mount("/api/v1/projects/", projectRoutes)
 	}
 	if len(workspaces) > 2 && workspaces[2] != nil {
-		var issueRoutes http.Handler = workspaces[2]
+		issueRoutes := workspaces[2]
 		if len(workspaces) > 4 && workspaces[4] != nil {
 			issueRoutes = issueAndCommentRoutes{issues: workspaces[2], comments: workspaces[4]}
 		}

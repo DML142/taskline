@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net"
@@ -25,6 +26,8 @@ func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /register", h.register)
 	mux.HandleFunc("POST /login", h.login)
+	mux.HandleFunc("POST /verify-email", h.verifyEmail)
+	mux.HandleFunc("POST /resend-verification", h.resendVerification)
 	mux.HandleFunc("POST /refresh", h.refresh)
 	mux.HandleFunc("POST /logout", h.logout)
 	mux.HandleFunc("GET /me", h.me)
@@ -46,13 +49,14 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, http.StatusTooManyRequests, "rate_limited", "Too many authentication attempts")
 		return
 	}
-	result, err := h.service.Register(r.Context(), RegisterInput{Name: in.Name, Email: in.Email, Password: in.Password})
+	result, err := h.service.Register(r.Context(), RegisterInput(in))
 	if err != nil {
 		h.limiter.recordFailure(r, "register", in.Email)
 		writeAuthError(w, http.StatusBadRequest, "invalid_request", "Invalid registration details")
 		return
 	}
-	h.writeAuthentication(w, result, http.StatusCreated)
+	_ = result
+	writeJSON(w, http.StatusAccepted, map[string]bool{"verificationRequired": true})
 }
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var in credentialsRequest
@@ -65,11 +69,49 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.service.Login(r.Context(), LoginInput{Email: in.Email, Password: in.Password})
 	if err != nil {
+		if errors.Is(err, ErrEmailVerificationRequired) {
+			writeAuthError(w, http.StatusForbidden, "email_verification_required", "Verify your email before signing in")
+			return
+		}
 		h.limiter.recordFailure(r, "login", in.Email)
 		writeAuthError(w, http.StatusUnauthorized, "invalid_credentials", "Invalid email or password")
 		return
 	}
 	h.writeAuthentication(w, result, http.StatusOK)
+}
+
+type verificationRequest struct {
+	Token string `json:"token"`
+}
+type resendVerificationRequest struct {
+	Email string `json:"email"`
+}
+
+func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
+	var in verificationRequest
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if err := h.service.VerifyEmail(r.Context(), in.Token); err != nil {
+		writeAuthError(w, http.StatusBadRequest, "verification_unavailable", "This verification link is unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"verified": true})
+}
+
+func (h *Handler) resendVerification(w http.ResponseWriter, r *http.Request) {
+	var in resendVerificationRequest
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if !h.limiter.take(r, "resend-verification", in.Email) {
+		writeAuthError(w, http.StatusTooManyRequests, "rate_limited", "Too many authentication attempts")
+		return
+	}
+	if err := h.service.ResendVerification(r.Context(), in.Email); err != nil {
+		h.limiter.recordFailure(r, "resend-verification", in.Email)
+	}
+	writeJSON(w, http.StatusAccepted, map[string]bool{"verificationRequired": true})
 }
 
 type authRateLimiter struct {
@@ -90,6 +132,22 @@ func (l *authRateLimiter) allow(r *http.Request, endpoint, email string) bool {
 	defer l.mu.Unlock()
 	l.prune(now)
 	return len(l.entries[key]) < 5
+}
+
+func (l *authRateLimiter) take(r *http.Request, endpoint, email string) bool {
+	key := rateLimitKey(r, endpoint, email)
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.prune(now)
+	if len(l.entries[key]) >= 5 {
+		return false
+	}
+	if _, exists := l.entries[key]; !exists && len(l.entries) >= maxRateLimitKeys {
+		return false
+	}
+	l.entries[key] = append(l.entries[key], now)
+	return true
 }
 
 func (l *authRateLimiter) recordFailure(r *http.Request, endpoint, email string) {
