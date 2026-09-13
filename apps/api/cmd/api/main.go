@@ -54,7 +54,7 @@ func run(logger *slog.Logger) error {
 	comments := comment.NewHandler(comment.NewService(comment.NewRepository(pool)), authService)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.NewRouter(logger, pool, authentication.Routes(), workspaces, projects, issues, invites, comments),
+		Handler:           httpserver.NewRouterWithCORS(logger, pool, cfg.Auth.WebOrigin, authentication.Routes(), workspaces, projects, issues, invites, comments),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

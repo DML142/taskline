@@ -61,9 +61,9 @@ Workspace invitations require `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, and `SMTP_T
 
 Run `docker compose --profile mailpit up -d --wait postgres mailpit`, then source `apps/api/.env.local.example` from `apps/api` before starting the API. Mailpit accepts local SMTP at `127.0.0.1:1025` and shows received messages at http://127.0.0.1:8025. No email leaves the machine.
 
-### Production SMTP with Resend
+### Production SMTP with AWS SES
 
-Copy `apps/api/.env.production.example` into your deployment's secret manager. Resend SMTP uses `smtp.resend.com`, port `587`, username `resend`, an API key as the password, and STARTTLS. Verify the sender domain and set `SMTP_FROM` to an address on it before sending invitations. Keep the API key out of git. [Resend SMTP documentation](https://resend.com/docs/send-with-smtp) lists the current credentials and prerequisites.
+Copy `apps/api/.env.production.example` into your deployment's secret manager. AWS SES SMTP uses the region-specific `email-smtp.*.amazonaws.com` endpoint, port `2587`, SES SMTP credentials, and STARTTLS. Verify the sender identity and set `SMTP_FROM` to the verified address before sending invitations or verification emails. Keep the SMTP credentials out of git. [AWS SES SMTP documentation](https://docs.aws.amazon.com/ses/latest/dg/send-using-smtp-programmatically.html) lists the current credentials and prerequisites.
 
 Set `NEXT_PUBLIC_API_URL` only when the API is not at `http://localhost:8080/api/v1`.
 

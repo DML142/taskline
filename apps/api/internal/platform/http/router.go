@@ -16,6 +16,14 @@ type Pinger interface {
 }
 
 func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handler, workspaces ...http.Handler) http.Handler {
+	return newRouter(logger, readiness, "", authentication, workspaces...)
+}
+
+func NewRouterWithCORS(logger *slog.Logger, readiness Pinger, webOrigin string, authentication http.Handler, workspaces ...http.Handler) http.Handler {
+	return newRouter(logger, readiness, webOrigin, authentication, workspaces...)
+}
+
+func newRouter(logger *slog.Logger, readiness Pinger, webOrigin string, authentication http.Handler, workspaces ...http.Handler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(func(next http.Handler) http.Handler {
@@ -46,6 +54,9 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 			next.ServeHTTP(w, r)
 		})
 	})
+	if webOrigin != "" {
+		r.Use(cors(logger, webOrigin))
+	}
 	r.Get("/api/v1/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
@@ -102,6 +113,32 @@ func NewRouter(logger *slog.Logger, readiness Pinger, authentication http.Handle
 		writeError(logger, w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed")
 	})
 	return r
+}
+
+func cors(logger *slog.Logger, webOrigin string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if origin != webOrigin {
+				writeError(logger, w, http.StatusForbidden, "forbidden_origin", "Origin is not allowed")
+				return
+			}
+			w.Header().Set("Access-Control-Allow-Origin", webOrigin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Vary", "Origin")
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 type issueAndCommentRoutes struct {

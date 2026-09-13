@@ -98,6 +98,43 @@ func TestRouterMountsWorkspaceRoutesBelowAPIPrefix(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, response.Code)
 }
 
+func TestRouterAddsCORSHeadersToNonAuthRoutes(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	workspaces := http.NewServeMux()
+	workspaces.HandleFunc("GET /", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	request := httptest.NewRequest(http.MethodOptions, "/api/v1/workspaces", nil)
+	request.Header.Set("Origin", "https://app.taskline.example")
+	request.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	request.Header.Set("Access-Control-Request-Headers", "Authorization")
+	response := httptest.NewRecorder()
+
+	NewRouterWithCORS(logger, fakePinger{}, "https://app.taskline.example", nil, workspaces).ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusNoContent, response.Code)
+	require.Equal(t, "https://app.taskline.example", response.Header().Get("Access-Control-Allow-Origin"))
+	require.Equal(t, "true", response.Header().Get("Access-Control-Allow-Credentials"))
+	require.Equal(t, "GET, POST, OPTIONS", response.Header().Get("Access-Control-Allow-Methods"))
+	require.Equal(t, "Authorization, Content-Type", response.Header().Get("Access-Control-Allow-Headers"))
+}
+
+func TestRouterRejectsUnexpectedOrigin(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	workspaces := http.NewServeMux()
+	workspaces.HandleFunc("POST /", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces", nil)
+	request.Header.Set("Origin", "https://malicious.example")
+	response := httptest.NewRecorder()
+
+	NewRouterWithCORS(logger, fakePinger{}, "https://app.taskline.example", nil, workspaces).ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusForbidden, response.Code)
+	require.JSONEq(t, `{"error":{"code":"forbidden_origin","message":"Origin is not allowed"}}`, response.Body.String())
+}
+
 func TestRouterMountsIssueRoutesBelowAPIPrefix(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	issues := http.NewServeMux()
