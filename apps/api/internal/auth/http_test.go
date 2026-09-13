@@ -52,6 +52,17 @@ func TestHandlerAllowsConfiguredOriginOnly(t *testing.T) {
 	require.Empty(t, denied.Header().Get("Access-Control-Allow-Origin"))
 }
 
+func TestHandlerUsesCrossSiteRefreshCookieWhenSecure(t *testing.T) {
+	handler := &Handler{config: Config{CookieSecure: true}}
+	response := httptest.NewRecorder()
+
+	handler.setRefreshCookie(response, "refresh-token", 3600)
+
+	setCookie := response.Header().Get("Set-Cookie")
+	require.Contains(t, setCookie, "Secure")
+	require.Contains(t, setCookie, "SameSite=None")
+}
+
 func TestHandlerRateLimitsAuthenticationAttempts(t *testing.T) {
 	handler := NewHandler(slog.New(slog.NewTextHandler(io.Discard, nil)), newTestService(t), Config{})
 	for range 5 {

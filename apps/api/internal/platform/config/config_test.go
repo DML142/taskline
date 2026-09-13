@@ -41,6 +41,18 @@ func TestLoad(t *testing.T) {
 	}
 }
 
+func TestLoadUsesRenderPortWhenConfigured(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
+	setValidAuthEnv(t)
+	t.Setenv("PORT", "10000")
+
+	cfg, err := Load()
+
+	require.NoError(t, err)
+	require.Equal(t, "0.0.0.0:10000", cfg.HTTPAddr)
+}
+
 func TestLoadRejectsNonURLDatabaseConfig(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("DATABASE_URL", "host=127.0.0.1 port=5432 user=taskline dbname=taskline")
@@ -66,6 +78,7 @@ func TestLoadDoesNotExposeMalformedDatabaseURL(t *testing.T) {
 
 func TestLoadRejectsShortJWTSecret(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("PORT", "")
 	t.Setenv("DATABASE_URL", "postgres://user:pass@127.0.0.1:5432/taskline?sslmode=disable")
 	t.Setenv("JWT_SECRET", "too-short")
 
@@ -125,6 +138,7 @@ func TestLoadRequiresSMTPConfiguration(t *testing.T) {
 
 func setValidAuthEnv(t *testing.T) {
 	t.Helper()
+	t.Setenv("PORT", "")
 	t.Setenv("JWT_SECRET", strings.Repeat("a", 32))
 	t.Setenv("JWT_ISSUER", "taskline-api")
 	t.Setenv("JWT_AUDIENCE", "taskline-web")
