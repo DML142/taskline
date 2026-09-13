@@ -236,7 +236,11 @@ func (h *Handler) writeAuthentication(w http.ResponseWriter, a Authentication, s
 	writeJSON(w, status, map[string]any{"user": publicUser(a.User), "accessToken": a.AccessToken})
 }
 func (h *Handler) setRefreshCookie(w http.ResponseWriter, value string, maxAge int) {
-	http.SetCookie(w, &http.Cookie{Name: "taskline_refresh", Value: value, Path: "/api/v1/auth", HttpOnly: true, Secure: h.config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: maxAge})
+	sameSite := http.SameSiteLaxMode
+	if h.config.CookieSecure {
+		sameSite = http.SameSiteNoneMode
+	}
+	http.SetCookie(w, &http.Cookie{Name: "taskline_refresh", Value: value, Path: "/api/v1/auth", HttpOnly: true, Secure: h.config.CookieSecure, SameSite: sameSite, MaxAge: maxAge})
 }
 func publicUser(u StoredUser) map[string]string {
 	return map[string]string{"id": u.ID.String(), "email": u.Email, "name": u.Name}
